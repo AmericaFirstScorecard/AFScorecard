@@ -29,7 +29,8 @@ let members = [
     party: "R",
     lifetimeScore: 92,
     currentScore: 95,
-    imageData: null
+    imageData: null,
+    trending: true  // <- maybe make one trending by default
   },
   {
     id: crypto.randomUUID(),
@@ -39,7 +40,8 @@ let members = [
     party: "R",
     lifetimeScore: 88,
     currentScore: 90,
-    imageData: null
+    imageData: null,
+    trending: false
   }
 ];
 
@@ -85,25 +87,27 @@ app.get("/api/members", (req, res) => {
 // add member (admin only)
 app.post("/api/members", requireAdmin, (req, res) => {
   const {
-    name = "New Member",
-    chamber = "House",
-    state = "",
-    party = "",
-    lifetimeScore = 0,
-    currentScore = 0,
-    imageData = null
-  } = req.body || {};
+  name = "New Member",
+  chamber = "House",
+  state = "",
+  party = "",
+  lifetimeScore = 0,
+  currentScore = 0,
+  imageData = null,
+  trending = false
+} = req.body || {};
 
-  const member = {
-    id: crypto.randomUUID(),
-    name,
-    chamber,
-    state,
-    party,
-    lifetimeScore,
-    currentScore,
-    imageData
-  };
+const member = {
+  id: crypto.randomUUID(),
+  name,
+  chamber,
+  state,
+  party,
+  lifetimeScore,
+  currentScore,
+  imageData,
+  trending
+};
 
   members.unshift(member);
   res.status(201).json(member);
@@ -118,14 +122,16 @@ app.put("/api/members/:id", requireAdmin, (req, res) => {
   }
 
   const allowedFields = [
-    "name",
-    "chamber",
-    "state",
-    "party",
-    "lifetimeScore",
-    "currentScore",
-    "imageData"
-  ];
+  "name",
+  "chamber",
+  "state",
+  "party",
+  "lifetimeScore",
+  "currentScore",
+  "imageData",
+  "trending"
+];
+
 
   const updates = {};
   for (const key of allowedFields) {
