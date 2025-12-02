@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>America First Scorecard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --blue: #002b5c;
+      --red: #c8102e;
+      --white: #ffffff;
+      --card-bg: #0a2344;
+      --border-color: #2f4770;
+      --text-light: #f5f7fb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      background: var(--blue);
+      color: var(--text-light);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      position: relative;
+      text-align: center;
+      padding: 1.5rem 1rem 0.5rem;
+      border-bottom: 2px solid var(--border-color);
+      background: linear-gradient(
+        to bottom,
+        #001632 0%,
+        #001b3b 40%,
+        var(--blue) 100%
+      );
+    }
+
+    header img {
+      max-width: 260px;
+      width: 40vw;
+      height: auto;
+      display: block;
+      margin: 0 auto 0.75rem;
+    }
+
+    header h1 {
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--white);
+    }
+
+    .admin-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+    }
+
+    .admin-toggle span {
+      opacity: 0.9;
+    }
+
+    .admin-btn {
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.8rem;
+      background: #04142d;
+      color: var(--text-light);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .admin-btn.admin-active {
+      background: var(--red);
+      border-color: #ff4a63;
+      font-weight: 600;
+    }
+
+    main {
+      max-width: 1100px;
+      width: 100%;
+      margin: 1.5rem auto 2rem;
+      padding: 0 1rem 2rem;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+      padding: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .card-header h2 {
+      font-size: 1.25rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    button,
+    select,
+    input[type="search"],
+    input[type="password"] {
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.8rem;
+      background: #04142d;
+      color: var(--text-light);
+      font-size: 0.9rem;
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--red);
+      border-color: #ff4a63;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    input[type="search"] {
+      min-width: 180px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.92rem;
+    }
+
+    thead {
+      background: #04142d;
+    }
+
+    th,
+    td {
+      padding: 0.55rem 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    th {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #c9d3e8;
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    td input,
+    td select {
+      width: 100%;
+      padding: 0.3rem 0.4rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(3, 18, 40, 0.8);
+      color: var(--text-light);
+      font-size: 0.9rem;
+    }
+
+    td input[disabled],
+    td select[disabled] {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    td input[type="number"] {
+      text-align: right;
+    }
+
+    td .remove-btn {
+      background: transparent;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .photo-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.3rem;
+    }
+
+    .photo-cell img {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: #081630;
+    }
+
+    .photo-cell .placeholder {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      opacity: 0.75;
+      background: #081630;
+    }
+
+    .photo-cell input[type="file"] {
+      font-size: 0.7rem;
+      padding: 0.1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(4, 20, 45, 0.9);
+    }
+
+    .footnote {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: #c0c8da;
+      opacity: 0.9;
+    }
+
+    .admin-login-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    .admin-login-panel.active {
+      display: flex;
+    }
+
+    .admin-login-card {
+      background: #04142d;
+      padding: 1.4rem 1.6rem;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      max-width: 320px;
+      width: 92%;
+      color: var(--text-light);
+    }
+
+    .admin-login-card h3 {
+      margin-bottom: 0.6rem;
+    }
+
+    .admin-login-card p {
+      font-size: 0.82rem;
+      margin-bottom: 0.7rem;
+      line-height: 1.3;
+    }
+
+    .admin-login-card form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+
+    .admin-login-card input[type="password"] {
+      border-radius: 10px;
+      width: 100%;
+    }
+
+    .admin-login-card .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+    }
+
+    .admin-login-card .secondary {
+      background: transparent;
+      border-color: var(--border-color);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
+    }
+
+    .error-msg {
+      color: #ffb3c2;
+      font-size: 0.78rem;
+      min-height: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      th:nth-child(4),
+      td:nth-child(4),
+      th:nth-child(5),
+      td:nth-child(5) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <!-- Put your AF banner file as public/af-logo.png -->
+    <img src="af-logo.png" alt="America First Logo" />
+
+    <div class="admin-toggle">
+      <span id="adminStatus">Viewer</span>
+      <button class="admin-btn" id="adminToggleBtn">Admin Login</button>
+    </div>
+
+    <h1>America First Scorecard</h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="card-header">
+        <h2>Member Scorecards</h2>
+        <div class="controls">
+          <input
+            type="search"
+            id="searchInput"
+            placeholder="Search by name, state, or party..."
+          />
+          <select id="chamberFilter">
+            <option value="all">All Chambers</option>
+            <option value="House">House</option>
+            <option value="Senate">Senate</option>
+          </select>
+          <button id="addMemberBtn">Add Member</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Photo</th>
+              <th>Name</th>
+              <th>Chamber</th>
+              <th>State</th>
+              <th>Party</th>
+              <th>Lifetime Score (%)</th>
+              <th>Current Congress (%)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="memberTableBody"></tbody>
+        </table>
+      </div>
+
+      <p class="footnote">
+        Scores and photos are editable only in admin mode. Data currently lives
+        on the server in memory; for long-term storage, you can upgrade this to
+        a database later.
+      </p>
+    </section>
+  </main>
+
+  <!-- Admin login modal -->
+  <div class="admin-login-panel" id="adminLoginPanel">
+    <div class="admin-login-card">
+      <h3>Admin Login</h3>
+      <p>Enter the admin password to edit scores, add members, and upload photos.</p>
+      <form id="adminLoginForm">
+        <input
+          type="password"
+          id="adminPasswordInput"
+          placeholder="Admin password"
+          autocomplete="current-password"
+        />
+        <div class="error-msg" id="adminError"></div>
+        <div class="actions">
+          <button type="button" class="secondary" id="adminCancelBtn">
+            Cancel
+          </button>
+          <button type="submit">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = ""; // same origin
+    let members = [];
+    let isAdmin = false;
+    let token = localStorage.getItem("afToken") || null;
+
+    // DOM
+    const tbody = document.getElementById("memberTableBody");
+    const searchInput = document.getElementById("searchInput");
+    const chamberFilter = document.getElementById("chamberFilter");
+    const addMemberBtn = document.getElementById("addMemberBtn");
+
+    const adminStatus = document.getElementById("adminStatus");
+    const adminToggleBtn = document.getElementById("adminToggleBtn");
+    const adminLoginPanel = document.getElementById("adminLoginPanel");
+    const adminLoginForm = document.getElementById("adminLoginForm");
+    const adminPasswordInput = document.getElementById("adminPasswordInput");
+    const adminCancelBtn = document.getElementById("adminCancelBtn");
+    const adminError = document.getElementById("adminError");
+
+    function authHeaders(extra = {}) {
+      const headers = { ...extra };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      return headers;
+    }
+
+    function updateAdminUI() {
+      if (isAdmin) {
+        adminStatus.textContent = "Admin";
+        adminToggleBtn.textContent = "Logout";
+        adminToggleBtn.classList.add("admin-active");
+        addMemberBtn.style.display = "inline-block";
+      } else {
+        adminStatus.textContent = "Viewer";
+        adminToggleBtn.textContent = "Admin Login";
+        adminToggleBtn.classList.remove("admin-active");
+        addMemberBtn.style.display = "none";
+      }
+    }
+
+    function renderTable() {
+      const searchTerm = searchInput.value.trim().toLowerCase();
+      const chamberValue = chamberFilter.value;
+
+      tbody.innerHTML = "";
+
+      members
+        .filter((m) => {
+          const chamberMatch =
+            chamberValue === "all" || m.chamber === chamberValue;
+          const text = `${m.name} ${m.state} ${m.party}`.toLowerCase();
+          const searchMatch = text.includes(searchTerm);
+          return chamberMatch && searchMatch;
+        })
+        .forEach((member) => {
+          const tr = document.createElement("tr");
+          tr.dataset.id = member.id;
+
+          const readonlyAttr = isAdmin ? "" : "disabled";
+
+          tr.innerHTML = `
+            <td>
+              <div class="photo-cell">
+                ${
+                  member.imageData
+                    ? `<img src="${member.imageData}" alt="${member.name}">`
+                    : `<div class="placeholder">No photo</div>`
+                }
+                ${
+                  isAdmin
+                    ? `<input type="file" name="photo" accept="image/*">`
+                    : ""
+                }
+              </div>
+            </td>
+            <td>
+              <input type="text" name="name" value="${member.name}" ${readonlyAttr}/>
+            </td>
+            <td>
+              <select name="chamber" ${readonlyAttr}>
+                <option value="House" ${
+                  member.chamber === "House" ? "selected" : ""
+                }>House</option>
+                <option value="Senate" ${
+                  member.chamber === "Senate" ? "selected" : ""
+                }>Senate</option>
+              </select>
+            </td>
+            <td>
+              <input type="text" name="state" maxlength="2" value="${
+                member.state || ""
+              }" ${readonlyAttr}/>
+            </td>
+            <td>
+              <input type="text" name="party" maxlength="3" value="${
+                member.party || ""
+              }" ${readonlyAttr}/>
+            </td>
+            <td>
+              <input type="number" name="lifetimeScore" min="0" max="100" step="0.1" value="${
+                member.lifetimeScore ?? ""
+              }" ${readonlyAttr}/>
+            </td>
+            <td>
+              <input type="number" name="currentScore" min="0" max="100" step="0.1" value="${
+                member.currentScore ?? ""
+              }" ${readonlyAttr}/>
+            </td>
+            <td>
+              ${
+                isAdmin
+                  ? `<button class="remove-btn" type="button">Remove</button>`
+                  : ""
+              }
+            </td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+    }
+
+    async function loadMembers() {
+      const res = await fetch(API_BASE + "/api/members");
+      members = await res.json();
+      renderTable();
+    }
+
+    async function addMember() {
+      if (!isAdmin || !token) return;
+      const res = await fetch(API_BASE + "/api/members", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({})
+      });
