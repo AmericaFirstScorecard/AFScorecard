@@ -167,7 +167,7 @@
       border-collapse: collapse;
       margin-top: 0.5rem;
       font-size: 0.92rem;
-      min-width: 600px;
+      min-width: 650px;
     }
 
     thead {
@@ -196,6 +196,15 @@
 
     tbody tr:hover {
       background: rgba(255, 255, 255, 0.05);
+    }
+
+    tr.draggable-row {
+      cursor: grab;
+    }
+
+    tr.drag-over {
+      outline: 2px dashed rgba(255, 255, 255, 0.5);
+      outline-offset: -2px;
     }
 
     td input,
@@ -388,6 +397,36 @@
       min-height: 1rem;
     }
 
+    .pagination {
+      margin-top: 0.9rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      justify-content: flex-end;
+      font-size: 0.85rem;
+    }
+
+    .pagination button {
+      padding: 0.25rem 0.6rem;
+      font-size: 0.8rem;
+      text-transform: none;
+      letter-spacing: 0;
+      background: #04142d;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .pagination button.current {
+      background: var(--red);
+      border-color: #ff4a63;
+      font-weight: 600;
+    }
+
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
     @media (max-width: 900px) {
       th:nth-child(4),
       td:nth-child(4),
@@ -463,9 +502,11 @@
         </table>
       </div>
 
+      <div class="pagination" id="pagination"></div>
+
       <p class="footnote">
         Scores and photos are view-only for visitors. Admins can edit
-        individual politicians, toggle trending, and upload portraits.
+        individual politicians, drag to reorder, toggle trending, and upload portraits.
       </p>
     </section>
   </main>
@@ -499,7 +540,9 @@
     let members = [];
     let isAdmin = false;
     let token = localStorage.getItem("afToken") || null;
-    const editingIds = new Set(); // which rows are in "edit" mode
+    const editingIds = new Set();
+    let currentPage = 1;
+    const pageSize = 10;
 
     // DOM
     const tbody = document.getElementById("memberTableBody");
@@ -514,6 +557,7 @@
     const adminPasswordInput = document.getElementById("adminPasswordInput");
     const adminCancelBtn = document.getElementById("adminCancelBtn");
     const adminError = document.getElementById("adminError");
+    const paginationEl = document.getElementById("pagination");
 
     function authHeaders(extra = {}) {
       const headers = { ...extra };
@@ -536,131 +580,217 @@
       }
     }
 
-    function renderTable() {
+    function getFilteredMembers() {
       const searchTerm = searchInput.value.trim().toLowerCase();
       const chamberValue = chamberFilter.value;
 
+      return members.filter((m) => {
+        const chamberMatch =
+          chamberValue === "all" || m.chamber === chamberValue;
+        const text = `${m.name} ${m.state} ${m.party}`.toLowerCase();
+        const searchMatch = text.includes(searchTerm);
+        return chamberMatch && searchMatch;
+      });
+    }
+
+    function renderPagination(filtered) {
+      const total = filtered.length;
+      const pageCount = Math.max(1, Math.ceil(total / pageSize));
+
+      if (currentPage > pageCount) currentPage = pageCount;
+
+      paginationEl.innerHTML = "";
+
+      const infoSpan = document.createElement("span");
+      const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+      const end = Math.min(currentPage * pageSize, total);
+      infoSpan.textContent = total
+        ? `Showing ${start}-${end} of ${total}`
+        : "No results";
+      paginationEl.appendChild(infoSpan);
+
+      const controls = document.createElement("div");
+      controls.style.display = "flex";
+      controls.style.gap = "0.3rem";
+      controls.style.alignItems = "center";
+
+      const prevBtn = document.createElement("button");
+      prevBtn.textContent = "Prev";
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.onclick = () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderTable();
+        }
+      };
+      controls.appendChild(prevBtn);
+
+      for (let p = 1; p <= pageCount; p++) {
+        const btn = document.createElement("button");
+        btn.textContent = p;
+        if (p === currentPage) btn.classList.add("current");
+        btn.onclick = () => {
+          currentPage = p;
+          renderTable();
+        };
+        controls.appendChild(btn);
+      }
+
+      const nextBtn = document.createElement("button");
+      nextBtn.textContent = "Next";
+      nextBtn.disabled = currentPage === pageCount;
+      nextBtn.onclick = () => {
+        if (currentPage < pageCount) {
+          currentPage++;
+          renderTable();
+        }
+      };
+      controls.appendChild(nextBtn);
+
+      paginationEl.appendChild(controls);
+    }
+
+    function renderTable() {
+      const filtered = getFilteredMembers();
+      renderPagination(filtered);
+
       tbody.innerHTML = "";
 
-      members
-        .filter((m) => {
-          const chamberMatch =
-            chamberValue === "all" || m.chamber === chamberValue;
-          const text = `${m.name} ${m.state} ${m.party}`.toLowerCase();
-          const searchMatch = text.includes(searchTerm);
-          return chamberMatch && searchMatch;
-        })
-        .forEach((member) => {
-          const tr = document.createElement("tr");
-          tr.dataset.id = member.id;
+      const total = filtered.length;
+      const pageCount = Math.max(1, Math.ceil(total / pageSize));
+      if (currentPage > pageCount) currentPage = pageCount;
 
-          const isEditing = isAdmin && editingIds.has(member.id);
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, total);
+      const pageItems = filtered.slice(startIndex, endIndex);
 
-          const photoDisplay = `
-            <div class="photo-cell">
-              <div class="photo-wrapper">
-                ${
-                  member.imageData
-                    ? `<img src="${member.imageData}" alt="${member.name}">`
-                    : `<div class="placeholder">No photo</div>`
-                }
-                ${member.trending ? '<span class="trending-icon">🔥</span>' : ""}
-              </div>
+      pageItems.forEach((member) => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = member.id;
+
+        const isEditing = isAdmin && editingIds.has(member.id);
+
+        if (isAdmin) {
+          tr.classList.add("draggable-row");
+          tr.setAttribute("draggable", "true");
+        } else {
+          tr.classList.remove("draggable-row");
+          tr.removeAttribute("draggable");
+        }
+
+        const photoDisplay = `
+          <div class="photo-cell">
+            <div class="photo-wrapper">
+              ${
+                member.imageData
+                  ? `<img src="${member.imageData}" alt="${member.name}">`
+                  : `<div class="placeholder">No photo</div>`
+              }
+              ${member.trending ? '<span class="trending-icon">🔥</span>' : ""}
+            </div>
+            ${
+              isEditing
+                ? `<input type="file" name="photo" accept="image/*">`
+                : ""
+            }
+          </div>
+        `;
+
+        const nameCell = isEditing
+          ? `<input type="text" name="name" value="${member.name || ""}" />`
+          : `<span class="display-text">${member.name || ""}</span>`;
+
+        const chamberCell = isEditing
+          ? `<select name="chamber">
+               <option value="House" ${
+                 member.chamber === "House" ? "selected" : ""
+               }>House</option>
+               <option value="Senate" ${
+                 member.chamber === "Senate" ? "selected" : ""
+               }>Senate</option>
+             </select>`
+          : `<span class="display-text">${member.chamber || ""}</span>`;
+
+        const stateCell = isEditing
+          ? `<input type="text" name="state" maxlength="2" value="${
+              member.state || ""
+            }" />`
+          : `<span class="display-text">${member.state || ""}</span>`;
+
+        const partyCell = isEditing
+          ? `<input type="text" name="party" maxlength="3" value="${
+              member.party || ""
+            }" />`
+          : `<span class="display-text">${member.party || ""}</span>`;
+
+        const lifetimeCell = isEditing
+          ? `<input type="number" name="lifetimeScore" min="0" max="100" step="0.1" value="${
+              member.lifetimeScore ?? ""
+            }" />`
+          : `<span class="display-text">${
+              member.lifetimeScore ?? ""
+            }</span>`;
+
+        const currentCell = isEditing
+          ? `<input type="number" name="currentScore" min="0" max="100" step="0.1" value="${
+              member.currentScore ?? ""
+            }" />`
+          : `<span class="display-text">${
+              member.currentScore ?? ""
+            }</span>`;
+
+        const actionsCell = isAdmin
+          ? `
+            <div class="row-actions">
+              <button type="button"
+                      class="edit-btn ${isEditing ? "editing" : ""}"
+                      data-action="toggle-edit">
+                ${isEditing ? "Done" : "Edit"}
+              </button>
+              <button type="button"
+                      class="trend-btn ${member.trending ? "on" : ""}"
+                      data-action="toggle-trending">
+                Trending 🔥
+              </button>
               ${
                 isEditing
-                  ? `<input type="file" name="photo" accept="image/*">`
+                  ? `<button type="button"
+                            class="remove-btn"
+                            data-action="remove">
+                       Remove
+                     </button>`
                   : ""
               }
             </div>
-          `;
+          `
+          : "";
 
-          const nameCell = isEditing
-            ? `<input type="text" name="name" value="${member.name || ""}" />`
-            : `<span class="display-text">${member.name || ""}</span>`;
+        tr.innerHTML = `
+          <td>${photoDisplay}</td>
+          <td>${nameCell}</td>
+          <td>${chamberCell}</td>
+          <td>${stateCell}</td>
+          <td>${partyCell}</td>
+          <td>${lifetimeCell}</td>
+          <td>${currentCell}</td>
+          <td>${actionsCell}</td>
+        `;
 
-          const chamberCell = isEditing
-            ? `<select name="chamber">
-                 <option value="House" ${
-                   member.chamber === "House" ? "selected" : ""
-                 }>House</option>
-                 <option value="Senate" ${
-                   member.chamber === "Senate" ? "selected" : ""
-                 }>Senate</option>
-               </select>`
-            : `<span class="display-text">${member.chamber || ""}</span>`;
-
-          const stateCell = isEditing
-            ? `<input type="text" name="state" maxlength="2" value="${
-                member.state || ""
-              }" />`
-            : `<span class="display-text">${member.state || ""}</span>`;
-
-          const partyCell = isEditing
-            ? `<input type="text" name="party" maxlength="3" value="${
-                member.party || ""
-              }" />`
-            : `<span class="display-text">${member.party || ""}</span>`;
-
-          const lifetimeCell = isEditing
-            ? `<input type="number" name="lifetimeScore" min="0" max="100" step="0.1" value="${
-                member.lifetimeScore ?? ""
-              }" />`
-            : `<span class="display-text">${
-                member.lifetimeScore ?? ""
-              }</span>`;
-
-          const currentCell = isEditing
-            ? `<input type="number" name="currentScore" min="0" max="100" step="0.1" value="${
-                member.currentScore ?? ""
-              }" />`
-            : `<span class="display-text">${
-                member.currentScore ?? ""
-              }</span>`;
-
-          const actionsCell = isAdmin
-            ? `
-              <div class="row-actions">
-                <button type="button"
-                        class="edit-btn ${isEditing ? "editing" : ""}"
-                        data-action="toggle-edit">
-                  ${isEditing ? "Done" : "Edit"}
-                </button>
-                <button type="button"
-                        class="trend-btn ${member.trending ? "on" : ""}"
-                        data-action="toggle-trending">
-                  Trending 🔥
-                </button>
-                ${
-                  isEditing
-                    ? `<button type="button"
-                              class="remove-btn"
-                              data-action="remove">
-                         Remove
-                       </button>`
-                    : ""
-                }
-              </div>
-            `
-            : "";
-
-          tr.innerHTML = `
-            <td>${photoDisplay}</td>
-            <td>${nameCell}</td>
-            <td>${chamberCell}</td>
-            <td>${stateCell}</td>
-            <td>${partyCell}</td>
-            <td>${lifetimeCell}</td>
-            <td>${currentCell}</td>
-            <td>${actionsCell}</td>
-          `;
-
-          tbody.appendChild(tr);
-        });
+        tbody.appendChild(tr);
+      });
     }
 
     async function loadMembers() {
       const res = await fetch(API_BASE + "/api/members");
       members = await res.json();
+      // sort by position just in case
+      members.sort((a, b) => {
+        const pa = a.position ?? 999999;
+        const pb = b.position ?? 999999;
+        if (pa !== pb) return pa - pb;
+        return (a.name || "").localeCompare(b.name || "");
+      });
+      currentPage = 1;
       renderTable();
     }
 
@@ -682,8 +812,9 @@
       });
       if (res.status === 401) return handleUnauthorized();
       const member = await res.json();
-      members.unshift(member);
+      members.push(member);
       editingIds.add(member.id);
+      currentPage = Math.ceil(members.length / pageSize);
       renderTable();
     }
 
@@ -712,16 +843,30 @@
       if (res.status === 401) return handleUnauthorized();
       members = members.filter((m) => m.id !== id);
       editingIds.delete(id);
+      if ((currentPage - 1) * pageSize >= members.length) {
+        currentPage = Math.max(1, Math.ceil(members.length / pageSize));
+      }
       renderTable();
     }
 
+    async function saveOrderToServer() {
+      if (!isAdmin || !token) return;
+      const ids = members.map((m) => m.id);
+      const res = await fetch(API_BASE + "/api/members/reorder", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ ids })
+      });
+      if (res.status === 401) return handleUnauthorized();
+    }
+
     // table events
-    // Note: use change/blur instead of input to avoid re-render-on-every-keystroke glitch
+
+    // update fields on change / blur (no "every key" glitch)
     tbody.addEventListener("change", (e) => {
       if (!isAdmin) return;
       const target = e.target;
 
-      // text/number/select changes
       if (target.tagName === "INPUT" || target.tagName === "SELECT") {
         if (target.type === "file") return; // handled separately
         const row = target.closest("tr");
@@ -737,7 +882,6 @@
       }
     });
 
-    // also fire on blur for smoother UX if user tabs out without "change" event firing
     tbody.addEventListener("blur", (e) => {
       if (!isAdmin) return;
       const target = e.target;
@@ -761,7 +905,6 @@
       updateMember(id, { [field]: value });
     }, true);
 
-    // file upload + buttons
     tbody.addEventListener("click", (e) => {
       if (!isAdmin) return;
       const btn = e.target.closest("button");
@@ -790,6 +933,7 @@
       }
     });
 
+    // file upload
     tbody.addEventListener("change", (e) => {
       if (!isAdmin) return;
       const input = e.target;
@@ -808,9 +952,61 @@
       }
     });
 
+    // drag & drop reordering
+    let dragSrcId = null;
+
+    tbody.addEventListener("dragstart", (e) => {
+      if (!isAdmin) return;
+      const row = e.target.closest("tr.draggable-row");
+      if (!row) return;
+      dragSrcId = row.dataset.id;
+      e.dataTransfer.effectAllowed = "move";
+    });
+
+    tbody.addEventListener("dragover", (e) => {
+      if (!isAdmin) return;
+      const row = e.target.closest("tr.draggable-row");
+      if (!row) return;
+      e.preventDefault();
+      row.classList.add("drag-over");
+    });
+
+    tbody.addEventListener("dragleave", (e) => {
+      const row = e.target.closest("tr.draggable-row");
+      if (!row) return;
+      row.classList.remove("drag-over");
+    });
+
+    tbody.addEventListener("drop", async (e) => {
+      if (!isAdmin) return;
+      e.preventDefault();
+      const row = e.target.closest("tr.draggable-row");
+      if (!row) return;
+      row.classList.remove("drag-over");
+
+      const targetId = row.dataset.id;
+      if (!dragSrcId || dragSrcId === targetId) return;
+
+      const srcIndex = members.findIndex((m) => m.id === dragSrcId);
+      const targetIndex = members.findIndex((m) => m.id === targetId);
+      if (srcIndex === -1 || targetIndex === -1) return;
+
+      const [moved] = members.splice(srcIndex, 1);
+      members.splice(targetIndex, 0, moved);
+
+      await saveOrderToServer();
+      renderTable();
+    });
+
     addMemberBtn.addEventListener("click", addMember);
-    searchInput.addEventListener("input", renderTable);
-    chamberFilter.addEventListener("change", renderTable);
+    searchInput.addEventListener("input", () => {
+      currentPage = 1;
+      renderTable();
+    });
+    chamberFilter.addEventListener("change", () => {
+      currentPage = 1;
+      renderTable();
+    });
 
     // admin login
     adminToggleBtn.addEventListener("click", () => {
@@ -873,7 +1069,7 @@
     // init
     (async function init() {
       if (token) {
-        isAdmin = true; // optimistic; if token invalid, API will kick us later
+        isAdmin = true; // optimistic
       }
       updateAdminUI();
       await loadMembers();
