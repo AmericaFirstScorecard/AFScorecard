@@ -349,3 +349,37 @@ initDb()
     console.error("Error initializing DB:", err);
     process.exit(1);
   });
+
+// get a single member by id (public)
+app.get("/api/members/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        chamber,
+        state,
+        party,
+        lifetime_score AS "lifetimeScore",
+        current_score AS "currentScore",
+        image_data AS "imageData",
+        trending,
+        position
+      FROM politicians
+      WHERE id = $1
+    `,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching member by id:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
