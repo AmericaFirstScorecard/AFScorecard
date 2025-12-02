@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>America First Scorecard – Member</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --blue: #002b5c;
+      --red: #c8102e;
+      --white: #ffffff;
+      --card-bg: #0a2344;
+      --border-color: #2f4770;
+      --text-light: #f5f7fb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      background: var(--blue);
+      color: var(--text-light);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      position: relative;
+      text-align: center;
+      padding: 1.2rem 1rem 0.7rem;
+      border-bottom: 2px solid var(--border-color);
+      background: linear-gradient(
+        to bottom,
+        #001632 0%,
+        #001b3b 40%,
+        var(--blue) 100%
+      );
+    }
+
+    header img {
+      max-width: 220px;
+      width: 40vw;
+      height: auto;
+      display: block;
+      margin: 0 auto 0.5rem;
+    }
+
+    header h1 {
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--white);
+    }
+
+    .back-link {
+      position: absolute;
+      left: 1rem;
+      top: 1.1rem;
+      font-size: 0.9rem;
+      color: #cfd6ea;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .back-link span {
+      font-size: 0.9rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    main {
+      max-width: 900px;
+      width: 100%;
+      margin: 1.5rem auto 2rem;
+      padding: 0 1rem 2rem;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+      padding: 1.5rem;
+    }
+
+    .member-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .photo-wrapper {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: #081630;
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .photo-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-placeholder {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      opacity: 0.8;
+      text-align: center;
+      padding: 0.3rem;
+    }
+
+    .trending-badge {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: #ff8a00;
+      border-radius: 999px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      color: #1b1305;
+      font-weight: 600;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    }
+
+    .member-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .member-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+
+    .member-line {
+      font-size: 0.95rem;
+      color: #d4ddf2;
+      margin-bottom: 0.2rem;
+    }
+
+    .member-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
+
+    .tag {
+      padding: 0.15rem 0.5rem;
+      font-size: 0.8rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(4, 20, 45, 0.9);
+    }
+
+    .scores-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .score-card {
+      background: rgba(3, 18, 40, 0.95);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 0.9rem 0.95rem;
+    }
+
+    .score-label {
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #c9d3e8;
+      margin-bottom: 0.25rem;
+    }
+
+    .score-value {
+      font-size: 1.35rem;
+      font-weight: 600;
+    }
+
+    .score-subtext {
+      margin-top: 0.1rem;
+      font-size: 0.8rem;
+      color: #cfd6ea;
+      opacity: 0.9;
+    }
+
+    .meta-section {
+      margin-top: 1.4rem;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: #d6def5;
+    }
+
+    .meta-section h3 {
+      font-size: 1rem;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #f0f3ff;
+    }
+
+    .meta-list {
+      list-style: none;
+    }
+
+    .meta-list li {
+      margin-bottom: 0.25rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .footnote {
+      margin-top: 1.2rem;
+      font-size: 0.8rem;
+      color: #c0c8da;
+      opacity: 0.9;
+    }
+
+    .loading,
+    .error {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 1rem;
+    }
+
+    .error {
+      color: #ffb3c2;
+    }
+
+    @media (max-width: 640px) {
+      .member-header {
+        align-items: flex-start;
+      }
+      .member-name {
+        font-size: 1.3rem;
+      }
+      .scores-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="index.html" class="back-link">
+      <span>← Back</span>
+    </a>
+    <img src="af-logo.png" alt="America First Logo" />
+    <h1>America First Scorecard</h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <div id="loading" class="loading">Loading member…</div>
+      <div id="error" class="error" style="display:none;"></div>
+
+      <div id="content" style="display:none;">
+        <div class="member-header">
+          <div class="photo-wrapper" id="photoWrapper">
+            <!-- photo or placeholder injected here -->
+          </div>
+          <div class="member-meta">
+            <div class="member-name" id="memberName"></div>
+            <div class="member-line" id="memberLine"></div>
+            <div class="member-tags" id="memberTags"></div>
+          </div>
+        </div>
+
+        <div class="scores-grid">
+          <div class="score-card">
+            <div class="score-label">Lifetime Score</div>
+            <div class="score-value" id="lifetimeScore">–</div>
+            <div class="score-subtext">
+              Overall alignment with America First priorities over career voting history.
+            </div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">Current Congress Score</div>
+            <div class="score-value" id="currentScore">–</div>
+            <div class="score-subtext">
+              Alignment in the current Congress only.
+            </div>
+          </div>
+        </div>
+
+        <div class="meta-section">
+          <h3>Member Details</h3>
+          <ul class="meta-list" id="metaList"></ul>
+        </div>
+
+        <p class="footnote">
+          All scores are calculated according to the America First Scorecard rubric
+          and may be updated as new votes are cast.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE = ""; // same origin
+
+    function getMemberIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id");
+    }
+
+    async function loadMember() {
+      const id = getMemberIdFromUrl();
+      const loadingEl = document.getElementById("loading");
+      const errorEl = document.getElementById("error");
+      const contentEl = document.getElementById("content");
+
+      if (!id) {
+        loadingEl.style.display = "none";
+        errorEl.style.display = "block";
+        errorEl.textContent = "No member id provided.";
+        return;
+      }
+
+      try {
+        const res = await fetch(API_BASE + "/api/members/" + encodeURIComponent(id));
+        if (res.status === 404) {
+          loadingEl.style.display = "none";
+          errorEl.style.display = "block";
+          errorEl.textContent = "Member not found.";
+          return;
+        }
+        if (!res.ok) {
+          throw new Error("Request failed: " + res.status);
+        }
+
+        const member = await res.json();
+        loadingEl.style.display = "none";
+        contentEl.style.display = "block";
+
+        renderMember(member);
+      } catch (err) {
+        console.error(err);
+        loadingEl.style.display = "none";
+        errorEl.style.display = "block";
+        errorEl.textContent = "Error loading member.";
+      }
+    }
+
+    function renderMember(member) {
+      const photoWrapper = document.getElementById("photoWrapper");
+      const memberName = document.getElementById("memberName");
+      const memberLine = document.getElementById("memberLine");
+      const memberTags = document.getElementById("memberTags");
+      const lifetimeScore = document.getElementById("lifetimeScore");
+      const currentScore = document.getElementById("currentScore");
+      const metaList = document.getElementById("metaList");
+
+      // photo
+      photoWrapper.innerHTML = "";
+      if (member.imageData) {
+        const img = document.createElement("img");
+        img.src = member.imageData;
+        img.alt = member.name || "Member photo";
+        photoWrapper.appendChild(img);
+      } else {
+        const div = document.createElement("div");
+        div.className = "photo-placeholder";
+        div.textContent = "No photo";
+        photoWrapper.appendChild(div);
+      }
+
+      if (member.trending) {
+        const badge = document.createElement("div");
+        badge.className = "trending-badge";
+        badge.innerHTML = "🔥 <span>Trending</span>";
+        photoWrapper.appendChild(badge);
+      }
+
+      // name
+      memberName.textContent = member.name || "Unknown Member";
+
+      // line: Chamber – State – Party
+      const chamber = member.chamber || "Unknown chamber";
+      const state = member.state ? member.state.toUpperCase() : "Unknown state";
+      const party = member.party || "Unknown party";
+      memberLine.textContent = `${chamber} • ${state} • ${party}`;
+
+      // tags
+      memberTags.innerHTML = "";
+      const tag1 = document.createElement("span");
+      tag1.className = "tag";
+      tag1.textContent = state;
+      memberTags.appendChild(tag1);
+
+      const tag2 = document.createElement("span");
+      tag2.className = "tag";
+      tag2.textContent = chamber;
+      memberTags.appendChild(tag2);
+
+      const tag3 = document.createElement("span");
+      tag3.className = "tag";
+      tag3.textContent = party;
+      memberTags.appendChild(tag3);
+
+      if (member.trending) {
+        const tagTrending = document.createElement("span");
+        tagTrending.className = "tag";
+        tagTrending.textContent = "Trending 🔥";
+        memberTags.appendChild(tagTrending);
+      }
+
+      // scores
+      lifetimeScore.textContent =
+        member.lifetimeScore !== null && member.lifetimeScore !== undefined
+          ? `${member.lifetimeScore.toFixed
+            ? member.lifetimeScore.toFixed(1)
+            : member.lifetimeScore} %`
+          : "–";
+
+      currentScore.textContent =
+        member.currentScore !== null && member.currentScore !== undefined
+          ? `${member.currentScore.toFixed
+            ? member.currentScore.toFixed(1)
+            : member.currentScore} %`
+          : "–";
+
+      // meta list
+      metaList.innerHTML = "";
+
+      const li1 = document.createElement("li");
+      li1.innerHTML = `<strong>Location:</strong> <span class="pill">State: ${state}</span>`;
+      metaList.appendChild(li1);
+
+      const li2 = document.createElement("li");
+      li2.innerHTML = `<strong>Chamber:</strong> <span class="pill">${chamber}</span>`;
+      metaList.appendChild(li2);
+
+      const li3 = document.createElement("li");
+      li3.innerHTML = `<strong>Party:</strong> <span class="pill">${party}</span>`;
+      metaList.appendChild(li3);
+
+      if (member.position != null) {
+        const li4 = document.createElement("li");
+        li4.innerHTML = `<strong>Ranking position:</strong> <span class="pill">#${member.position}</span>`;
+        metaList.appendChild(li4);
+      }
+    }
+
+    loadMember();
+  </script>
+</body>
+</html>
