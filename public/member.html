@@ -251,6 +251,109 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
+    .votes-section {
+      margin-top: 1.6rem;
+      font-size: 0.9rem;
+      color: #d6def5;
+    }
+
+    .votes-section h3 {
+      font-size: 1rem;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #f0f3ff;
+    }
+
+    .votes-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .vote-item {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(3, 18, 40, 0.95);
+      padding: 0.75rem 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .vote-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.35rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .vote-title {
+      font-weight: 600;
+    }
+
+    .vote-date {
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+
+    .vote-tags {
+      margin-top: 0.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+    }
+
+    .vote-desc {
+      margin-top: 0.3rem;
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    .vote-link {
+      margin-top: 0.25rem;
+      font-size: 0.8rem;
+    }
+
+    .vote-link a {
+      color: #cfe2ff;
+      text-decoration: none;
+    }
+
+    .vote-link a:hover {
+      text-decoration: underline;
+    }
+
+    .bill-tag-af {
+      border-color: #46ff9a;
+      background: rgba(7, 61, 32, 0.8);
+    }
+
+    .bill-tag-neutral {
+      border-color: #ffd966;
+      background: rgba(77, 63, 12, 0.7);
+    }
+
+    .bill-tag-anti {
+      border-color: #ff6b81;
+      background: rgba(81, 15, 19, 0.8);
+    }
+
+    .vote-tag-yes {
+      border-color: #46ff9a;
+      background: rgba(7, 61, 32, 0.8);
+    }
+
+    .vote-tag-no {
+      border-color: #ff6b81;
+      background: rgba(81, 15, 19, 0.8);
+    }
+
+    .vote-tag-abstain {
+      border-color: #ffd966;
+      background: rgba(77, 63, 12, 0.7);
+    }
+
     .footnote {
       margin-top: 1.2rem;
       font-size: 0.8rem;
@@ -269,6 +372,68 @@
       color: #ffb3c2;
     }
 
+    .admin-bills-section {
+      margin-top: 1.8rem;
+      padding-top: 1.1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.9rem;
+    }
+
+    .admin-bills-section h3 {
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #f0f3ff;
+    }
+
+    .admin-bills-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 1rem;
+    }
+
+    .admin-bills-section label {
+      display: block;
+      font-size: 0.8rem;
+      margin-bottom: 0.15rem;
+      color: #d4ddf2;
+    }
+
+    .admin-bills-section input,
+    .admin-bills-section select,
+    .admin-bills-section textarea {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(3, 18, 40, 0.95);
+      color: var(--text-light);
+      font-size: 0.85rem;
+      padding: 0.3rem 0.4rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .admin-bills-section textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .admin-bills-section button {
+      border-radius: 999px;
+      border: 1px solid #ff4a63;
+      background: var(--red);
+      color: var(--text-light);
+      font-size: 0.85rem;
+      padding: 0.35rem 0.9rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .admin-bills-section button:hover {
+      filter: brightness(1.08);
+    }
+
     @media (max-width: 640px) {
       .member-header {
         align-items: flex-start;
@@ -277,6 +442,9 @@
         font-size: 1.3rem;
       }
       .scores-grid {
+        grid-template-columns: 1fr;
+      }
+      .admin-bills-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -298,9 +466,7 @@
 
       <div id="content" style="display:none;">
         <div class="member-header">
-          <div class="photo-wrapper" id="photoWrapper">
-            <!-- photo or placeholder injected here -->
-          </div>
+          <div class="photo-wrapper" id="photoWrapper"></div>
           <div class="member-meta">
             <div class="member-name" id="memberName"></div>
             <div class="member-line" id="memberLine"></div>
@@ -330,9 +496,81 @@
           <ul class="meta-list" id="metaList"></ul>
         </div>
 
+        <!-- Voting record (everyone can see) -->
+        <div class="votes-section">
+          <h3>Voting Record</h3>
+          <ul class="votes-list" id="votesList"></ul>
+        </div>
+
+        <!-- Admin-only tools: add bills + attach vote -->
+        <div class="admin-bills-section" id="adminBillsSection" style="display:none;">
+          <h3>Admin – Manage Bills & Votes</h3>
+          <div class="admin-bills-grid">
+            <!-- Add bill -->
+            <div>
+              <p style="margin-bottom:0.4rem;font-size:0.85rem;opacity:0.9;">
+                Add a new bill to the global list. Once added, you can attach it to this member
+                (and others) with their vote.
+              </p>
+              <form id="addBillForm">
+                <label for="billTitle">Bill title</label>
+                <input id="billTitle" name="title" required />
+
+                <label for="billChamber">Chamber</label>
+                <select id="billChamber" name="chamber">
+                  <option value="">Both / Other</option>
+                  <option value="House">House</option>
+                  <option value="Senate">Senate</option>
+                </select>
+
+                <label for="billAFPosition">America First classification</label>
+                <select id="billAFPosition" name="afPosition">
+                  <option value="America First">America First</option>
+                  <option value="Neither">Neither</option>
+                  <option value="Anti-America First">Anti-America First</option>
+                </select>
+
+                <label for="billDate">Bill date (vote date)</label>
+                <input id="billDate" name="billDate" type="date" />
+
+                <label for="billGovLink">Gov link (if applicable)</label>
+                <input id="billGovLink" name="govLink" type="url" placeholder="https://..." />
+
+                <label for="billDescription">Description</label>
+                <textarea id="billDescription" name="description"></textarea>
+
+                <button type="submit">Add Bill</button>
+              </form>
+            </div>
+
+            <!-- Attach to this member -->
+            <div>
+              <p style="margin-bottom:0.4rem;font-size:0.85rem;opacity:0.9;">
+                Attach an existing bill to this member and record whether they
+                approved or opposed it.
+              </p>
+              <form id="attachBillForm">
+                <label for="billSelect">Select bill</label>
+                <select id="billSelect" name="billId">
+                  <!-- options injected -->
+                </select>
+
+                <label for="voteSelect">How did this member vote?</label>
+                <select id="voteSelect" name="vote">
+                  <option value="Approved">Approved / Yes</option>
+                  <option value="Opposed">Opposed / No</option>
+                  <option value="Abstained">Abstained</option>
+                </select>
+
+                <button type="submit" style="margin-top:0.4rem;">Add to Scorecard</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <p class="footnote">
-          All scores are calculated according to the America First Scorecard rubric
-          and may be updated as new votes are cast.
+          All scores and votes are based on the America First Scorecard rubric and
+          may be updated as new bills and votes are recorded.
         </p>
       </div>
     </section>
@@ -340,6 +578,18 @@
 
   <script>
     const API_BASE = ""; // same origin
+    let memberId = null;
+    let member = null;
+    let isAdmin = false;
+    let token = localStorage.getItem("afToken") || null;
+    let memberVotes = [];
+    let availableBills = [];
+
+    function authHeaders(extra = {}) {
+      const headers = { ...extra };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      return headers;
+    }
 
     function getMemberIdFromUrl() {
       const params = new URLSearchParams(window.location.search);
@@ -347,12 +597,12 @@
     }
 
     async function loadMember() {
-      const id = getMemberIdFromUrl();
+      memberId = getMemberIdFromUrl();
       const loadingEl = document.getElementById("loading");
       const errorEl = document.getElementById("error");
       const contentEl = document.getElementById("content");
 
-      if (!id) {
+      if (!memberId) {
         loadingEl.style.display = "none";
         errorEl.style.display = "block";
         errorEl.textContent = "No member id provided.";
@@ -360,7 +610,7 @@
       }
 
       try {
-        const res = await fetch(API_BASE + "/api/members/" + encodeURIComponent(id));
+        const res = await fetch(API_BASE + "/api/members/" + encodeURIComponent(memberId));
         if (res.status === 404) {
           loadingEl.style.display = "none";
           errorEl.style.display = "block";
@@ -371,11 +621,16 @@
           throw new Error("Request failed: " + res.status);
         }
 
-        const member = await res.json();
+        member = await res.json();
         loadingEl.style.display = "none";
         contentEl.style.display = "block";
 
         renderMember(member);
+        await loadMemberVotes();
+        if (isAdmin) {
+          await loadAvailableBills();
+          updateAdminUI();
+        }
       } catch (err) {
         console.error(err);
         loadingEl.style.display = "none";
@@ -417,7 +672,6 @@
       // name
       memberName.textContent = member.name || "Unknown Member";
 
-      // line: Chamber – State – Party
       const chamber = member.chamber || "Unknown chamber";
       const state = member.state ? member.state.toUpperCase() : "Unknown state";
       const party = member.party || "Unknown party";
@@ -484,7 +738,271 @@
       }
     }
 
-    loadMember();
+    async function loadMemberVotes() {
+      const res = await fetch(
+        API_BASE + "/api/members/" + encodeURIComponent(memberId) + "/bills"
+      );
+      if (!res.ok) {
+        console.error("Error loading member votes:", res.status);
+        return;
+      }
+      memberVotes = await res.json();
+      renderVotes();
+    }
+
+    function renderVotes() {
+      const list = document.getElementById("votesList");
+      list.innerHTML = "";
+
+      if (!memberVotes.length) {
+        const li = document.createElement("li");
+        li.className = "vote-item";
+        li.textContent = "No recorded votes yet for this member.";
+        list.appendChild(li);
+        return;
+      }
+
+      memberVotes.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "vote-item";
+
+        const header = document.createElement("div");
+        header.className = "vote-header";
+
+        const titleSpan = document.createElement("span");
+        titleSpan.className = "vote-title";
+        titleSpan.textContent = item.title || "Unnamed bill";
+
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "vote-date";
+        if (item.billDate) {
+          dateSpan.textContent = new Date(item.billDate).toLocaleDateString();
+        } else {
+          dateSpan.textContent = "Date unknown";
+        }
+
+        header.appendChild(titleSpan);
+        header.appendChild(dateSpan);
+        li.appendChild(header);
+
+        const tags = document.createElement("div");
+        tags.className = "vote-tags";
+
+        // AF classification tag
+        const afTag = document.createElement("span");
+        afTag.className = "pill";
+        const pos = item.afPosition || "";
+        if (pos === "America First") {
+          afTag.classList.add("bill-tag-af");
+        } else if (pos === "Neither") {
+          afTag.classList.add("bill-tag-neutral");
+        } else if (pos === "Anti-America First") {
+          afTag.classList.add("bill-tag-anti");
+        }
+        afTag.textContent = pos || "Unclassified";
+        tags.appendChild(afTag);
+
+        // vote tag
+        const voteTag = document.createElement("span");
+        voteTag.className = "pill";
+        if (item.vote === "Approved") {
+          voteTag.classList.add("vote-tag-yes");
+          voteTag.textContent = "Member vote: Approved";
+        } else if (item.vote === "Opposed") {
+          voteTag.classList.add("vote-tag-no");
+          voteTag.textContent = "Member vote: Opposed";
+        } else if (item.vote === "Abstained") {
+          voteTag.classList.add("vote-tag-abstain");
+          voteTag.textContent = "Member vote: Abstained";
+        } else {
+          voteTag.textContent = "Member vote: Not recorded";
+        }
+        tags.appendChild(voteTag);
+
+        li.appendChild(tags);
+
+        if (item.description) {
+          const desc = document.createElement("div");
+          desc.className = "vote-desc";
+          desc.textContent = item.description;
+          li.appendChild(desc);
+        }
+
+        if (item.govLink) {
+          const linkDiv = document.createElement("div");
+          linkDiv.className = "vote-link";
+          const a = document.createElement("a");
+          a.href = item.govLink;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = "View bill details";
+          linkDiv.appendChild(a);
+          li.appendChild(linkDiv);
+        }
+
+        list.appendChild(li);
+      });
+    }
+
+    async function loadAvailableBills() {
+      if (!member || !isAdmin) return;
+      const chamber = member.chamber || "";
+      const url =
+        chamber && (chamber === "House" || chamber === "Senate")
+          ? API_BASE + "/api/bills?chamber=" + encodeURIComponent(chamber)
+          : API_BASE + "/api/bills";
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.error("Error loading bills:", res.status);
+        return;
+      }
+      availableBills = await res.json();
+      renderBillSelect();
+    }
+
+    function renderBillSelect() {
+      const select = document.getElementById("billSelect");
+      select.innerHTML = "";
+
+      if (!availableBills.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No bills available yet";
+        select.appendChild(opt);
+        select.disabled = true;
+        return;
+      }
+
+      select.disabled = false;
+      availableBills.forEach((b) => {
+        const opt = document.createElement("option");
+        opt.value = b.id;
+        const datePart = b.billDate
+          ? new Date(b.billDate).toLocaleDateString()
+          : "No date";
+        opt.textContent = `${datePart} – ${b.title}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function updateAdminUI() {
+      const adminSection = document.getElementById("adminBillsSection");
+      adminSection.style.display = isAdmin ? "block" : "none";
+
+      // Prefill bill chamber with member's chamber if available
+      if (member && member.chamber) {
+        const billChamber = document.getElementById("billChamber");
+        if (member.chamber === "House" || member.chamber === "Senate") {
+          billChamber.value = member.chamber;
+        }
+      }
+    }
+
+    // Admin forms
+    async function handleAddBill(e) {
+      e.preventDefault();
+      if (!isAdmin || !token) return;
+
+      const title = document.getElementById("billTitle").value.trim();
+      const chamber = document.getElementById("billChamber").value || null;
+      const afPosition = document.getElementById("billAFPosition").value || null;
+      const billDate = document.getElementById("billDate").value || null;
+      const govLink = document.getElementById("billGovLink").value.trim() || null;
+      const description = document.getElementById("billDescription").value.trim() || null;
+
+      if (!title) {
+        alert("Bill title is required.");
+        return;
+      }
+
+      try {
+        const res = await fetch(API_BASE + "/api/bills", {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            title,
+            chamber,
+            afPosition,
+            billDate,
+            description,
+            govLink,
+          }),
+        });
+
+        if (res.status === 401) {
+          alert("Admin session expired. Please log in again on the main page.");
+          return;
+        }
+
+        if (!res.ok) {
+          alert("Error adding bill.");
+          return;
+        }
+
+        // Clear form, reload bills
+        document.getElementById("addBillForm").reset();
+        await loadAvailableBills();
+      } catch (err) {
+        console.error("Error adding bill:", err);
+        alert("Error adding bill.");
+      }
+    }
+
+    async function handleAttachBill(e) {
+      e.preventDefault();
+      if (!isAdmin || !token) return;
+
+      const billId = document.getElementById("billSelect").value;
+      const vote = document.getElementById("voteSelect").value;
+
+      if (!billId) {
+        alert("Select a bill first.");
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          API_BASE + "/api/members/" + encodeURIComponent(memberId) + "/bills",
+          {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ billId, vote }),
+          }
+        );
+
+        if (res.status === 401) {
+          alert("Admin session expired. Please log in again on the main page.");
+          return;
+        }
+
+        if (!res.ok) {
+          alert("Error attaching bill to member.");
+          return;
+        }
+
+        await loadMemberVotes();
+      } catch (err) {
+        console.error("Error attaching bill:", err);
+        alert("Error attaching bill.");
+      }
+    }
+
+    // init
+    (async function init() {
+      // If we already have a token (from main page login), treat as admin here too.
+      if (token) {
+        isAdmin = true;
+      }
+      document
+        .getElementById("addBillForm")
+        .addEventListener("submit", handleAddBill);
+      document
+        .getElementById("attachBillForm")
+        .addEventListener("submit", handleAttachBill);
+
+      await loadMember();
+    })();
   </script>
 </body>
 </html>
