@@ -4,51 +4,37 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import pkg from "pg";
+
+const { Pool } = pkg;
 
 const app = express();
 
 // --- config ---
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me"; // set this in Render
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me"; // set in Render
+const DATABASE_URL = process.env.DATABASE_URL;
 
-// --- basic middleware ---
-app.use(cors()); // safe since frontend is same origin, but fine to keep
-app.use(express.json({ limit: "5mb" })); // allow image data URLs in JSON
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is not set. Please add it in Render environment.");
+}
 
-// static files (frontend)
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // Render Postgres usually needs SSL
+});
+
+// --- middleware ---
+app.use(cors());
+app.use(express.json({ limit: "5mb" })); // allow image data URLs
+
+// static files
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
-// in-memory "database"
-let members = [
-  {
-    id: crypto.randomUUID(),
-    name: "Sample Senator",
-    chamber: "Senate",
-    state: "TX",
-    party: "R",
-    lifetimeScore: 92,
-    currentScore: 95,
-    imageData: null,
-    trending: true  // <- maybe make one trending by default
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "Sample Representative",
-    chamber: "House",
-    state: "FL",
-    party: "R",
-    lifetimeScore: 88,
-    currentScore: 90,
-    imageData: null,
-    trending: false
-  }
-];
-
-// simple in-memory token store
+// simple in-memory token store (admin sessions)
 const adminTokens = new Set();
 
-// --- helpers ---
 function getTokenFromReq(req) {
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) return null;
@@ -57,10 +43,45 @@ function getTokenFromReq(req) {
 
 function requireAdmin(req, res, next) {
   const token = getTokenFromReq(req);
-  if (token && adminTokens.has(token)) {
-    return next();
-  }
+  if (token && adminTokens.has(token)) return next();
   return res.status(401).json({ error: "Unauthorized" });
+}
+
+// --- DB bootstrap ---
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS politicians (
+      id UUID PRIMARY KEY,
+      name TEXT,
+      chamber TEXT,
+      state CHAR(2),
+      party TEXT,
+      lifetime_score NUMERIC,
+      current_score NUMERIC,
+      image_data TEXT,
+      trending BOOLEAN DEFAULT FALSE,
+      position INTEGER
+    );
+  `);
+
+  // If table is empty, seed with a couple of examples
+  const { rows } = await pool.query("SELECT COUNT(*) AS count FROM politicians");
+  const count = parseInt(rows[0].count, 10);
+  if (count === 0) {
+    const id1 = crypto.randomUUID();
+    const id2 = crypto.randomUUID();
+    await pool.query(
+      `
+      INSERT INTO politicians
+        (id, name, chamber, state, party, lifetime_score, current_score, image_data, trending, position)
+      VALUES
+        ($1, $2, 'Senate', 'TX', 'R', 92, 95, NULL, TRUE, 1),
+        ($3, $4, 'House', 'FL', 'R', 88, 90, NULL, FALSE, 2)
+    `,
+      [id1, "Sample Senator", id2, "Sample Representative"]
+    );
+    console.log("Seeded initial politicians.");
+  }
 }
 
 // --- routes ---
@@ -79,59 +100,109 @@ app.post("/api/login", (req, res) => {
   res.json({ token });
 });
 
-// get all members (public)
-app.get("/api/members", (req, res) => {
-  res.json(members);
+// get all members (public), ordered by position then name
+app.get("/api/members", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        chamber,
+        state,
+        party,
+        lifetime_score AS "lifetimeScore",
+        current_score AS "currentScore",
+        image_data AS "imageData",
+        trending,
+        position
+      FROM politicians
+      ORDER BY position NULLS LAST, name ASC;
+    `
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching members:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // add member (admin only)
-app.post("/api/members", requireAdmin, (req, res) => {
-  const {
-  name = "New Member",
-  chamber = "House",
-  state = "",
-  party = "",
-  lifetimeScore = 0,
-  currentScore = 0,
-  imageData = null,
-  trending = false
-} = req.body || {};
+app.post("/api/members", requireAdmin, async (req, res) => {
+  try {
+    const {
+      name = "New Member",
+      chamber = "House",
+      state = "",
+      party = "",
+      lifetimeScore = 0,
+      currentScore = 0,
+      imageData = null,
+      trending = false,
+    } = req.body || {};
 
-const member = {
-  id: crypto.randomUUID(),
-  name,
-  chamber,
-  state,
-  party,
-  lifetimeScore,
-  currentScore,
-  imageData,
-  trending
-};
+    // get max position
+    const { rows } = await pool.query(
+      "SELECT COALESCE(MAX(position), 0) AS maxpos FROM politicians"
+    );
+    const nextPosition = (rows[0].maxpos || 0) + 1;
 
-  members.unshift(member);
-  res.status(201).json(member);
+    const id = crypto.randomUUID();
+
+    const insertResult = await pool.query(
+      `
+      INSERT INTO politicians
+        (id, name, chamber, state, party, lifetime_score, current_score, image_data, trending, position)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING
+        id,
+        name,
+        chamber,
+        state,
+        party,
+        lifetime_score AS "lifetimeScore",
+        current_score AS "currentScore",
+        image_data AS "imageData",
+        trending,
+        position;
+    `,
+      [
+        id,
+        name,
+        chamber,
+        state,
+        party,
+        lifetimeScore,
+        currentScore,
+        imageData,
+        trending,
+        nextPosition,
+      ]
+    );
+
+    res.status(201).json(insertResult.rows[0]);
+  } catch (err) {
+    console.error("Error adding member:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // update member (admin only, partial update)
-app.put("/api/members/:id", requireAdmin, (req, res) => {
+app.put("/api/members/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const idx = members.findIndex((m) => m.id === id);
-  if (idx === -1) {
-    return res.status(404).json({ error: "Not found" });
-  }
 
   const allowedFields = [
-  "name",
-  "chamber",
-  "state",
-  "party",
-  "lifetimeScore",
-  "currentScore",
-  "imageData",
-  "trending"
-];
-
+    "name",
+    "chamber",
+    "state",
+    "party",
+    "lifetimeScore",
+    "currentScore",
+    "imageData",
+    "trending",
+    "position",
+  ];
 
   const updates = {};
   for (const key of allowedFields) {
@@ -140,23 +211,141 @@ app.put("/api/members/:id", requireAdmin, (req, res) => {
     }
   }
 
-  members[idx] = { ...members[idx], ...updates };
-  res.json(members[idx]);
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No valid fields to update" });
+  }
+
+  const setClauses = [];
+  const values = [];
+  let idx = 1;
+
+  // map JS names to DB columns
+  const fieldToColumn = {
+    name: "name",
+    chamber: "chamber",
+    state: "state",
+    party: "party",
+    lifetimeScore: "lifetime_score",
+    currentScore: "current_score",
+    imageData: "image_data",
+    trending: "trending",
+    position: "position",
+  };
+
+  for (const [key, value] of Object.entries(updates)) {
+    setClauses.push(`${fieldToColumn[key]} = $${idx++}`);
+    values.push(value);
+  }
+  values.push(id);
+
+  const query = `
+    UPDATE politicians
+    SET ${setClauses.join(", ")}
+    WHERE id = $${idx}
+    RETURNING
+      id,
+      name,
+      chamber,
+      state,
+      party,
+      lifetime_score AS "lifetimeScore",
+      current_score AS "currentScore",
+      image_data AS "imageData",
+      trending,
+      position;
+  `;
+
+  try {
+    const result = await pool.query(query, values);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating member:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // delete member (admin only)
-app.delete("/api/members/:id", requireAdmin, (req, res) => {
+app.delete("/api/members/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const idx = members.findIndex((m) => m.id === id);
-  if (idx === -1) {
-    return res.status(404).json({ error: "Not found" });
+  try {
+    const result = await pool.query(
+      `
+      DELETE FROM politicians
+      WHERE id = $1
+      RETURNING
+        id,
+        name,
+        chamber,
+        state,
+        party,
+        lifetime_score AS "lifetimeScore",
+        current_score AS "currentScore",
+        image_data AS "imageData",
+        trending,
+        position;
+    `,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error deleting member:", err);
+    res.status(500).json({ error: "Server error" });
   }
-  const [removed] = members.splice(idx, 1);
-  res.json(removed);
 });
 
-// --- start server ---
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("AFScorecard server listening on port", PORT);
+// bulk reorder (admin only) – for drag & drop
+// body: { ids: ["id1", "id2", ...] } -> position = index+1
+app.post("/api/members/reorder", requireAdmin, async (req, res) => {
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "ids array required" });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const pos = i + 1;
+        await client.query(
+          "UPDATE politicians SET position = $1 WHERE id = $2",
+          [pos, id]
+        );
+      }
+
+      await client.query("COMMIT");
+      res.json({ success: true });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Error reordering members:", err);
+      res.status(500).json({ error: "Server error" });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("Error getting client for reorder:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
+
+// --- start ---
+const PORT = process.env.PORT || 3000;
+
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log("AFScorecard server listening on port", PORT);
+    });
+  })
+  .catch((err) => {
+    console.error("Error initializing DB:", err);
+    process.exit(1);
+  });
