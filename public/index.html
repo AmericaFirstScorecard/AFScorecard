@@ -698,7 +698,7 @@
 
         const nameCell = isEditing
           ? `<input type="text" name="name" value="${member.name || ""}" />`
-          : `<span class="display-text">${member.name || ""}</span>`;
+          : `<a href="member.html?id=${member.id}" class="name-link">${member.name || ""}</a>`;
 
         const chamberCell = isEditing
           ? `<select name="chamber">
