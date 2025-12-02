@@ -31,6 +31,7 @@
     }
 
     header {
+      position: relative;
       text-align: center;
       padding: 1.5rem 1rem 0.5rem;
       border-bottom: 2px solid var(--border-color);
@@ -55,6 +56,36 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--white);
+    }
+
+    .admin-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+    }
+
+    .admin-toggle span {
+      opacity: 0.9;
+    }
+
+    .admin-btn {
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.8rem;
+      background: #04142d;
+      color: var(--text-light);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .admin-btn.admin-active {
+      background: var(--red);
+      border-color: #ff4a63;
+      font-weight: 600;
     }
 
     main {
@@ -94,7 +125,8 @@
 
     button,
     select,
-    input[type="search"] {
+    input[type="search"],
+    input[type="password"] {
       border-radius: 999px;
       border: 1px solid var(--border-color);
       padding: 0.4rem 0.8rem;
@@ -137,6 +169,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       text-align: left;
       white-space: nowrap;
+      vertical-align: middle;
     }
 
     th {
@@ -165,6 +198,12 @@
       font-size: 0.9rem;
     }
 
+    td input[disabled],
+    td select[disabled] {
+      opacity: 0.7;
+      cursor: default;
+    }
+
     td input[type="number"] {
       text-align: right;
     }
@@ -179,6 +218,44 @@
       letter-spacing: 0;
     }
 
+    .photo-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.3rem;
+    }
+
+    .photo-cell img {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: #081630;
+    }
+
+    .photo-cell .placeholder {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      opacity: 0.75;
+      background: #081630;
+    }
+
+    .photo-cell input[type="file"] {
+      font-size: 0.7rem;
+      padding: 0.1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(4, 20, 45, 0.9);
+    }
+
     .footnote {
       margin-top: 0.75rem;
       font-size: 0.8rem;
@@ -186,7 +263,77 @@
       opacity: 0.9;
     }
 
-    @media (max-width: 720px) {
+    .admin-login-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    .admin-login-panel.active {
+      display: flex;
+    }
+
+    .admin-login-card {
+      background: #04142d;
+      padding: 1.4rem 1.6rem;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      max-width: 320px;
+      width: 92%;
+      color: var(--text-light);
+    }
+
+    .admin-login-card h3 {
+      margin-bottom: 0.6rem;
+    }
+
+    .admin-login-card p {
+      font-size: 0.82rem;
+      margin-bottom: 0.7rem;
+      line-height: 1.3;
+    }
+
+    .admin-login-card form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+
+    .admin-login-card input[type="password"] {
+      border-radius: 10px;
+      width: 100%;
+    }
+
+    .admin-login-card .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+    }
+
+    .admin-login-card .secondary {
+      background: transparent;
+      border-color: var(--border-color);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
+    }
+
+    .error-msg {
+      color: #ffb3c2;
+      font-size: 0.78rem;
+      min-height: 1rem;
+    }
+
+    @media (max-width: 900px) {
       th:nth-child(3),
       td:nth-child(3),
       th:nth-child(4),
@@ -194,12 +341,27 @@
         display: none;
       }
     }
+
+    @media (max-width: 720px) {
+      header img {
+        max-width: 210px;
+      }
+      .card {
+        padding: 1.1rem;
+      }
+    }
   </style>
 </head>
 <body>
   <header>
-    <!-- Replace "af-logo.png" with the path/filename of YOUR logo/banner -->
+    <!-- Replace "af-logo.png" with the path/filename of YOUR banner/logo -->
     <img src="af-logo.png" alt="America First Logo" />
+
+    <div class="admin-toggle">
+      <span id="adminStatus">Viewer</span>
+      <button class="admin-btn" id="adminToggleBtn">Admin Login</button>
+    </div>
+
     <h1>America First Scorecard</h1>
   </header>
 
@@ -226,6 +388,7 @@
         <table>
           <thead>
             <tr>
+              <th>Photo</th>
               <th>Name</th>
               <th>Chamber</th>
               <th>State</th>
@@ -240,15 +403,42 @@
       </div>
 
       <p class="footnote">
-        Scores are editable. Changes are saved locally in your browser so you
-        can manually maintain and adjust each member’s America First alignment.
+        Scores and photos are editable only in admin mode. Data is stored
+        locally in your browser for now; for a public launch, connect this to a
+        secure backend.
       </p>
     </section>
   </main>
 
+  <!-- Admin login modal -->
+  <div class="admin-login-panel" id="adminLoginPanel">
+    <div class="admin-login-card">
+      <h3>Admin Login</h3>
+      <p>Enter the admin password to edit scores, add members, and upload photos.</p>
+      <form id="adminLoginForm">
+        <input
+          type="password"
+          id="adminPasswordInput"
+          placeholder="Admin password"
+          autocomplete="current-password"
+        />
+        <div class="error-msg" id="adminError"></div>
+        <div class="actions">
+          <button type="button" class="secondary" id="adminCancelBtn">
+            Cancel
+          </button>
+          <button type="submit">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
-    // ---------- DATA & STORAGE ----------
-    const STORAGE_KEY = "afScorecardMembers_v1";
+    // ===== ADMIN CONFIG (demo only — not secure for real deployment) =====
+    const ADMIN_PASSWORD = "ChangeThisPassword"; // <-- change this before using
+
+    const STORAGE_KEY = "afScorecardMembers_v2";
+    const ADMIN_STATE_KEY = "afScorecardIsAdmin";
 
     const defaultMembers = [
       {
@@ -259,6 +449,7 @@
         party: "R",
         lifetimeScore: 92,
         currentScore: 95,
+        imageData: null,
       },
       {
         id: crypto.randomUUID(),
@@ -268,6 +459,7 @@
         party: "R",
         lifetimeScore: 88,
         currentScore: 90,
+        imageData: null,
       },
     ];
 
@@ -276,7 +468,7 @@
         const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (Array.isArray(data) && data.length > 0) return data;
       } catch (e) {
-        console.warn("Could not read saved data:", e);
+        console.warn("Error reading stored members:", e);
       }
       return defaultMembers;
     }
@@ -285,13 +477,45 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
     }
 
-    let members = loadMembers();
+    function loadAdminState() {
+      return localStorage.getItem(ADMIN_STATE_KEY) === "true";
+    }
 
-    // ---------- RENDER ----------
+    function saveAdminState(isAdmin) {
+      localStorage.setItem(ADMIN_STATE_KEY, String(isAdmin));
+    }
+
+    let members = loadMembers();
+    let isAdmin = loadAdminState();
+
+    // ===== DOM ELEMENTS =====
     const tbody = document.getElementById("memberTableBody");
     const searchInput = document.getElementById("searchInput");
     const chamberFilter = document.getElementById("chamberFilter");
     const addMemberBtn = document.getElementById("addMemberBtn");
+
+    const adminStatus = document.getElementById("adminStatus");
+    const adminToggleBtn = document.getElementById("adminToggleBtn");
+    const adminLoginPanel = document.getElementById("adminLoginPanel");
+    const adminLoginForm = document.getElementById("adminLoginForm");
+    const adminPasswordInput = document.getElementById("adminPasswordInput");
+    const adminCancelBtn = document.getElementById("adminCancelBtn");
+    const adminError = document.getElementById("adminError");
+
+    // ===== RENDER =====
+    function updateAdminUI() {
+      if (isAdmin) {
+        adminStatus.textContent = "Admin";
+        adminToggleBtn.textContent = "Logout";
+        adminToggleBtn.classList.add("admin-active");
+        addMemberBtn.style.display = "inline-block";
+      } else {
+        adminStatus.textContent = "Viewer";
+        adminToggleBtn.textContent = "Admin Login";
+        adminToggleBtn.classList.remove("admin-active");
+        addMemberBtn.style.display = "none";
+      }
+    }
 
     function renderTable() {
       const searchTerm = searchInput.value.trim().toLowerCase();
@@ -303,23 +527,38 @@
         .filter((m) => {
           const chamberMatch =
             chamberValue === "all" || m.chamber === chamberValue;
-
-          const text =
-            `${m.name} ${m.state} ${m.party}`.toLowerCase();
+          const text = `${m.name} ${m.state} ${m.party}`.toLowerCase();
           const searchMatch = text.includes(searchTerm);
-
           return chamberMatch && searchMatch;
         })
         .forEach((member) => {
           const tr = document.createElement("tr");
           tr.dataset.id = member.id;
 
+          const photoCellHtml = `
+            <div class="photo-cell">
+              ${
+                member.imageData
+                  ? `<img src="${member.imageData}" alt="${member.name}">`
+                  : `<div class="placeholder">No photo</div>`
+              }
+              ${
+                isAdmin
+                  ? `<input type="file" name="photo" accept="image/*">`
+                  : ""
+              }
+            </div>
+          `;
+
+          const readonlyAttr = isAdmin ? "" : "disabled";
+
           tr.innerHTML = `
+            <td>${photoCellHtml}</td>
             <td>
-              <input type="text" name="name" value="${member.name}" />
+              <input type="text" name="name" value="${member.name}" ${readonlyAttr}/>
             </td>
             <td>
-              <select name="chamber">
+              <select name="chamber" ${readonlyAttr}>
                 <option value="House" ${
                   member.chamber === "House" ? "selected" : ""
                 }>House</option>
@@ -331,25 +570,29 @@
             <td>
               <input type="text" name="state" maxlength="2" value="${
                 member.state
-              }" />
+              }" ${readonlyAttr}/>
             </td>
             <td>
               <input type="text" name="party" maxlength="3" value="${
                 member.party
-              }" />
+              }" ${readonlyAttr}/>
             </td>
             <td>
               <input type="number" name="lifetimeScore" min="0" max="100" step="0.1" value="${
                 member.lifetimeScore
-              }" />
+              }" ${readonlyAttr}/>
             </td>
             <td>
               <input type="number" name="currentScore" min="0" max="100" step="0.1" value="${
                 member.currentScore
-              }" />
+              }" ${readonlyAttr}/>
             </td>
             <td>
-              <button class="remove-btn" type="button">Remove</button>
+              ${
+                isAdmin
+                  ? `<button class="remove-btn" type="button">Remove</button>`
+                  : ""
+              }
             </td>
           `;
 
@@ -357,11 +600,12 @@
         });
     }
 
+    updateAdminUI();
     renderTable();
 
-    // ---------- EVENTS ----------
-    // Save edits on input change
+    // ===== TABLE EVENTS =====
     tbody.addEventListener("input", (e) => {
+      if (!isAdmin) return;
       const target = e.target;
       const row = target.closest("tr");
       if (!row) return;
@@ -381,8 +625,31 @@
       saveMembers(members);
     });
 
-    // Remove member
+    // photo upload
+    tbody.addEventListener("change", (e) => {
+      if (!isAdmin) return;
+      const input = e.target;
+      if (input.type !== "file" || input.name !== "photo") return;
+      const row = input.closest("tr");
+      const id = row.dataset.id;
+      const member = members.find((m) => m.id === id);
+      if (!member) return;
+
+      const file = input.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        member.imageData = ev.target.result;
+        saveMembers(members);
+        renderTable(); // re-render to update preview
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // remove member
     tbody.addEventListener("click", (e) => {
+      if (!isAdmin) return;
       const btn = e.target.closest(".remove-btn");
       if (!btn) return;
 
@@ -394,8 +661,9 @@
       renderTable();
     });
 
-    // Add member
+    // add member
     addMemberBtn.addEventListener("click", () => {
+      if (!isAdmin) return;
       const newMember = {
         id: crypto.randomUUID(),
         name: "New Member",
@@ -404,15 +672,60 @@
         party: "",
         lifetimeScore: 0,
         currentScore: 0,
+        imageData: null,
       };
       members.unshift(newMember);
       saveMembers(members);
       renderTable();
     });
 
-    // Search & filter
+    // search & filter
     searchInput.addEventListener("input", renderTable);
     chamberFilter.addEventListener("change", renderTable);
+
+    // ===== ADMIN LOGIN LOGIC =====
+    adminToggleBtn.addEventListener("click", () => {
+      if (isAdmin) {
+        // logout
+        isAdmin = false;
+        saveAdminState(isAdmin);
+        updateAdminUI();
+        renderTable();
+      } else {
+        // open modal
+        adminError.textContent = "";
+        adminPasswordInput.value = "";
+        adminLoginPanel.classList.add("active");
+        setTimeout(() => adminPasswordInput.focus(), 50);
+      }
+    });
+
+    adminCancelBtn.addEventListener("click", () => {
+      adminLoginPanel.classList.remove("active");
+      adminError.textContent = "";
+    });
+
+    adminLoginForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const val = adminPasswordInput.value || "";
+      if (val === ADMIN_PASSWORD) {
+        isAdmin = true;
+        saveAdminState(isAdmin);
+        adminLoginPanel.classList.remove("active");
+        adminError.textContent = "";
+        updateAdminUI();
+        renderTable();
+      } else {
+        adminError.textContent = "Incorrect password.";
+      }
+    });
+
+    adminLoginPanel.addEventListener("click", (e) => {
+      if (e.target === adminLoginPanel) {
+        adminLoginPanel.classList.remove("active");
+        adminError.textContent = "";
+      }
+    });
   </script>
 </body>
 </html>
