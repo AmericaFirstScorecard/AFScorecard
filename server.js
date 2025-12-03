@@ -110,8 +110,23 @@ function getTokenFromReq(req) {
 }
 
 function requireAdmin(req, res, next) {
-  const token = getTokenFromReq(req);
-  if (token && adminTokens.has(token)) return next();
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : null;
+
+  if (token && adminTokens.has(token)) {
+    return next();
+  }
+
+  // NEW: log why it's failing
+  console.warn(
+    "[requireAdmin] Unauthorized request",
+    {
+      path: req.path,
+      hasAuthHeader: !!req.headers.authorization,
+      tokenSnippet: token ? token.slice(0, 8) + "..." : null,
+    }
+  );
+
   return res.status(401).json({ error: "Unauthorized" });
 }
 
