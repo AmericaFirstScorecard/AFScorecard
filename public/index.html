@@ -733,20 +733,12 @@
           : `<span class="display-text">${member.party || ""}</span>`;
 
         const lifetimeCell = isEditing
-          ? `<input type="number" name="lifetimeScore" min="0" max="100" step="0.1" value="${
-              member.lifetimeScore ?? ""
-            }" />`
-          : `<span class="display-text">${
-              member.lifetimeScore ?? ""
-            }</span>`;
+          ? `<input type="number" name="lifetimeScore" ...>`
+          : `<span class="display-text">${member.lifetimeScore ?? ""}</span>`;
 
         const currentCell = isEditing
-          ? `<input type="number" name="currentScore" min="0" max="100" step="0.1" value="${
-              member.currentScore ?? ""
-            }" />`
-          : `<span class="display-text">${
-              member.currentScore ?? ""
-            }</span>`;
+          ? `<input type="number" name="currentScore" ...>`
+          : `<span class="display-text">${member.currentScore ?? ""}</span>`;
 
         const actionsCell = isAdmin
           ? `
