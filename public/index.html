@@ -5,15 +5,6 @@
   <title>America First Scorecard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    .name-link {
-      color: #ffffff;
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .name-link:hover {
-      text-decoration: underline;
-    }
     :root {
       --blue: #002b5c;
       --red: #c8102e;
@@ -139,8 +130,7 @@
 
     button,
     select,
-    input[type="search"],
-    input[type="password"] {
+    input[type="search"] {
       border-radius: 999px;
       border: 1px solid var(--border-color);
       padding: 0.4rem 0.8rem;
@@ -158,6 +148,19 @@
       letter-spacing: 0.04em;
     }
 
+    button.secondary {
+      background: transparent;
+      border-color: var(--border-color);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
+    }
+
+    button.danger {
+      background: #5a0b16;
+      border-color: #ff6b81;
+    }
+
     button:hover {
       filter: brightness(1.08);
     }
@@ -166,17 +169,11 @@
       min-width: 180px;
     }
 
-    .table-wrapper {
-      width: 100%;
-      overflow-x: auto;
-    }
-
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 0.5rem;
       font-size: 0.92rem;
-      min-width: 650px;
     }
 
     thead {
@@ -207,13 +204,79 @@
       background: rgba(255, 255, 255, 0.05);
     }
 
-    tr.draggable-row {
-      cursor: grab;
+    .photo-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
     }
 
-    tr.drag-over {
-      outline: 2px dashed rgba(255, 255, 255, 0.5);
-      outline-offset: -2px;
+    .photo-wrapper {
+      position: relative;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      overflow: hidden;
+      background: #081630;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .photo-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-placeholder {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      opacity: 0.8;
+      text-align: center;
+      padding: 0.2rem;
+    }
+
+    .trending-dot {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: #ff8a00;
+      border-radius: 999px;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.7rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.15rem;
+      color: #1b1305;
+      font-weight: 600;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    }
+
+    .member-name-text {
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .member-name-text a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .member-name-text a:hover {
+      text-decoration: underline;
+    }
+
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 0.75rem;
+      background: rgba(3, 18, 40, 0.85);
     }
 
     td input,
@@ -227,106 +290,26 @@
       font-size: 0.9rem;
     }
 
-    td input[disabled],
-    td select[disabled] {
-      opacity: 0.7;
-      cursor: default;
+    td input[type="checkbox"] {
+      width: auto;
     }
 
-    td input[type="number"] {
-      text-align: right;
-    }
-
-    .row-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-    }
-
-    .row-actions button {
-      font-size: 0.75rem;
-      padding: 0.3rem 0.6rem;
-      text-transform: none;
-      letter-spacing: 0;
-    }
-
-    .row-actions .remove-btn {
-      background: transparent;
-      border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    .row-actions .edit-btn {
-      background: #04142d;
-      border-color: rgba(255, 255, 255, 0.35);
-    }
-
-    .row-actions .edit-btn.editing {
-      background: var(--red);
-      border-color: #ff4a63;
-    }
-
-    .row-actions .trend-btn {
-      background: transparent;
-      border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    .row-actions .trend-btn.on {
-      border-color: #ffb347;
-    }
-
-    .photo-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.3rem;
-    }
-
-    .photo-wrapper {
-      position: relative;
-      display: inline-block;
-    }
-
-    .photo-wrapper img {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      background: #081630;
-    }
-
-    .photo-wrapper .placeholder {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      border: 1px dashed rgba(255, 255, 255, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      opacity: 0.75;
-      background: #081630;
-    }
-
-    .trending-icon {
-      position: absolute;
-      top: -6px;
-      right: -6px;
-      font-size: 1rem;
-      filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7));
-    }
-
-    .photo-cell input[type="file"] {
+    .photo-input {
       font-size: 0.7rem;
-      padding: 0.1rem;
+      margin-top: 0.2rem;
+      padding: 0.15rem 0.3rem;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.3);
       background: rgba(4, 20, 45, 0.9);
     }
 
-    .display-text {
-      font-size: 0.9rem;
+    .actions-cell button {
+      margin-right: 0.25rem;
+      margin-bottom: 0.2rem;
+      font-size: 0.78rem;
+      padding: 0.25rem 0.5rem;
+      text-transform: none;
+      letter-spacing: 0;
     }
 
     .footnote {
@@ -334,6 +317,55 @@
       font-size: 0.8rem;
       color: #c0c8da;
       opacity: 0.9;
+    }
+
+    .pagination {
+      margin-top: 0.75rem;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+    }
+
+    .pagination button {
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: #04142d;
+      color: var(--text-light);
+      padding: 0.2rem 0.5rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .pagination button.current {
+      background: var(--red);
+      border-color: #ff4a63;
+      font-weight: 600;
+    }
+
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .pagination span {
+      opacity: 0.9;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      font-size: 1rem;
+      opacity: 0.7;
+      user-select: none;
+      padding-right: 0.15rem;
+    }
+
+    tr.dragging {
+      opacity: 0.4;
     }
 
     .admin-login-panel {
@@ -383,6 +415,10 @@
     .admin-login-card input[type="password"] {
       border-radius: 10px;
       width: 100%;
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.6rem;
+      background: #020b1a;
+      color: var(--text-light);
     }
 
     .admin-login-card .actions {
@@ -406,36 +442,6 @@
       min-height: 1rem;
     }
 
-    .pagination {
-      margin-top: 0.9rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      align-items: center;
-      justify-content: flex-end;
-      font-size: 0.85rem;
-    }
-
-    .pagination button {
-      padding: 0.25rem 0.6rem;
-      font-size: 0.8rem;
-      text-transform: none;
-      letter-spacing: 0;
-      background: #04142d;
-      border-color: rgba(255, 255, 255, 0.3);
-    }
-
-    .pagination button.current {
-      background: var(--red);
-      border-color: #ff4a63;
-      font-weight: 600;
-    }
-
-    .pagination button:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-
     @media (max-width: 900px) {
       th:nth-child(4),
       td:nth-child(4),
@@ -452,18 +458,22 @@
       .card {
         padding: 1.1rem;
       }
+      .controls {
+        width: 100%;
+      }
       table {
         font-size: 0.85rem;
       }
-      .row-actions {
-        flex-direction: row;
-        flex-wrap: wrap;
+      th,
+      td {
+        padding: 0.45rem 0.35rem;
       }
     }
   </style>
 </head>
 <body>
   <header>
+    <!-- Replace "af-logo.png" with your banner/logo file -->
     <img src="af-logo.png" alt="America First Logo" />
 
     <div class="admin-toggle">
@@ -489,7 +499,10 @@
             <option value="House">House</option>
             <option value="Senate">Senate</option>
           </select>
-          <button id="addMemberBtn">Add Member</button>
+          <button id="addMemberBtn" style="display:none;">Add Member</button>
+          <button id="syncMembersBtn" style="display:none;">
+            Sync Congress Members
+          </button>
         </div>
       </div>
 
@@ -497,6 +510,7 @@
         <table>
           <thead>
             <tr>
+              <th></th>
               <th>Photo</th>
               <th>Name</th>
               <th>Chamber</th>
@@ -504,6 +518,7 @@
               <th>Party</th>
               <th>Lifetime Score (%)</th>
               <th>Current Congress (%)</th>
+              <th>Trending</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -514,8 +529,10 @@
       <div class="pagination" id="pagination"></div>
 
       <p class="footnote">
-        Scores and photos are view-only for visitors. Admins can edit
-        individual politicians, drag to reorder, toggle trending, and upload portraits.
+        Public visitors see read-only scorecards. Admins can log in to sync
+        current members from Congress.gov, adjust details, upload photos,
+        mark trending members, and manage ordering. Scores are computed from
+        the bills & votes system.
       </p>
     </section>
   </main>
@@ -524,7 +541,7 @@
   <div class="admin-login-panel" id="adminLoginPanel">
     <div class="admin-login-card">
       <h3>Admin Login</h3>
-      <p>Enter the admin password to edit scores, add members, and upload photos.</p>
+      <p>Enter the admin password to add/edit members and sync Congress data.</p>
       <form id="adminLoginForm">
         <input
           type="password"
@@ -548,16 +565,20 @@
 
     let members = [];
     let isAdmin = false;
+    let editingId = null; // which member row is currently being edited
     let token = localStorage.getItem("afToken") || null;
-    const editingIds = new Set();
     let currentPage = 1;
     const pageSize = 10;
+    let draggedId = null;
+    const pendingImageData = {}; // memberId -> dataURL
 
-    // DOM
+    // DOM elements
     const tbody = document.getElementById("memberTableBody");
     const searchInput = document.getElementById("searchInput");
     const chamberFilter = document.getElementById("chamberFilter");
     const addMemberBtn = document.getElementById("addMemberBtn");
+    const syncMembersBtn = document.getElementById("syncMembersBtn");
+    const paginationEl = document.getElementById("pagination");
 
     const adminStatus = document.getElementById("adminStatus");
     const adminToggleBtn = document.getElementById("adminToggleBtn");
@@ -566,7 +587,6 @@
     const adminPasswordInput = document.getElementById("adminPasswordInput");
     const adminCancelBtn = document.getElementById("adminCancelBtn");
     const adminError = document.getElementById("adminError");
-    const paginationEl = document.getElementById("pagination");
 
     function authHeaders(extra = {}) {
       const headers = { ...extra };
@@ -580,42 +600,296 @@
         adminToggleBtn.textContent = "Logout";
         adminToggleBtn.classList.add("admin-active");
         addMemberBtn.style.display = "inline-block";
+        syncMembersBtn.style.display = "inline-block";
       } else {
         adminStatus.textContent = "Viewer";
         adminToggleBtn.textContent = "Admin Login";
         adminToggleBtn.classList.remove("admin-active");
         addMemberBtn.style.display = "none";
-        editingIds.clear();
+        syncMembersBtn.style.display = "none";
+        editingId = null;
+      }
+      renderTable();
+    }
+
+    async function fetchMembers() {
+      try {
+        const res = await fetch(API_BASE + "/api/members");
+        if (!res.ok) {
+          console.error("Error fetching members:", res.status);
+          return;
+        }
+        members = await res.json();
+        currentPage = 1;
+        renderTable();
+      } catch (err) {
+        console.error("Network error fetching members:", err);
       }
     }
 
     function getFilteredMembers() {
-      const searchTerm = searchInput.value.trim().toLowerCase();
-      const chamberValue = chamberFilter.value;
+      const searchTerm = (searchInput.value || "").trim().toLowerCase();
+      const chamberValue = chamberFilter.value || "all";
 
       return members.filter((m) => {
         const chamberMatch =
           chamberValue === "all" || m.chamber === chamberValue;
-        const text = `${m.name} ${m.state} ${m.party}`.toLowerCase();
-        const searchMatch = text.includes(searchTerm);
+        const text = `${m.name || ""} ${m.state || ""} ${m.party || ""}`.toLowerCase();
+        const searchMatch = !searchTerm || text.includes(searchTerm);
         return chamberMatch && searchMatch;
       });
     }
 
-    function renderPagination(filtered) {
+    function renderTable() {
+      const filtered = getFilteredMembers();
       const total = filtered.length;
-      const pageCount = Math.max(1, Math.ceil(total / pageSize));
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      if (currentPage > totalPages) currentPage = totalPages;
 
-      if (currentPage > pageCount) currentPage = pageCount;
+      const start = (currentPage - 1) * pageSize;
+      const end = Math.min(start + pageSize, total);
+      const slice = filtered.slice(start, end);
 
+      tbody.innerHTML = "";
+
+      slice.forEach((member) => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = member.id;
+
+        // drag handle only for admin & not editing
+        if (isAdmin && !editingId) {
+          tr.setAttribute("draggable", "true");
+        } else {
+          tr.removeAttribute("draggable");
+        }
+
+        const isEditing = editingId === member.id;
+
+        // --- drag handle cell ---
+        const dragTd = document.createElement("td");
+        dragTd.innerHTML = isAdmin ? '<span class="drag-handle">☰</span>' : "";
+        tr.appendChild(dragTd);
+
+        // --- photo cell ---
+        const photoTd = document.createElement("td");
+        const photoDiv = document.createElement("div");
+        photoDiv.className = "photo-cell";
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "photo-wrapper";
+
+        if (member.imageData) {
+          const img = document.createElement("img");
+          img.src = member.imageData;
+          img.alt = member.name || "Photo";
+          wrapper.appendChild(img);
+        } else {
+          const ph = document.createElement("div");
+          ph.className = "photo-placeholder";
+          ph.textContent = "No photo";
+          wrapper.appendChild(ph);
+        }
+
+        if (member.trending) {
+          const dot = document.createElement("div");
+          dot.className = "trending-dot";
+          dot.innerHTML = "🔥 <span>Trending</span>";
+          wrapper.appendChild(dot);
+        }
+
+        photoDiv.appendChild(wrapper);
+
+        if (isAdmin && isEditing) {
+          const fileInput = document.createElement("input");
+          fileInput.type = "file";
+          fileInput.accept = "image/*";
+          fileInput.className = "photo-input";
+          photoDiv.appendChild(fileInput);
+        }
+
+        photoTd.appendChild(photoDiv);
+        tr.appendChild(photoTd);
+
+        // --- name cell (with link) ---
+        const nameTd = document.createElement("td");
+        if (isEditing && isAdmin) {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.name = "name";
+          input.value = member.name || "";
+          nameTd.appendChild(input);
+        } else {
+          const span = document.createElement("span");
+          span.className = "member-name-text";
+          const a = document.createElement("a");
+          a.href = "member.html?id=" + encodeURIComponent(member.id);
+          a.textContent = member.name || "Unnamed";
+          span.appendChild(a);
+          nameTd.appendChild(span);
+        }
+        tr.appendChild(nameTd);
+
+        // --- chamber ---
+        const chamberTd = document.createElement("td");
+        if (isEditing && isAdmin) {
+          const select = document.createElement("select");
+          select.name = "chamber";
+          ["House", "Senate"].forEach((ch) => {
+            const opt = document.createElement("option");
+            opt.value = ch;
+            opt.textContent = ch;
+            if (member.chamber === ch) opt.selected = true;
+            select.appendChild(opt);
+          });
+          chamberTd.appendChild(select);
+        } else {
+          chamberTd.textContent = member.chamber || "";
+        }
+        tr.appendChild(chamberTd);
+
+        // --- state ---
+        const stateTd = document.createElement("td");
+        if (isEditing && isAdmin) {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.name = "state";
+          input.maxLength = 2;
+          input.value = member.state || "";
+          stateTd.appendChild(input);
+        } else {
+          stateTd.textContent = member.state || "";
+        }
+        tr.appendChild(stateTd);
+
+        // --- party ---
+        const partyTd = document.createElement("td");
+        if (isEditing && isAdmin) {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.name = "party";
+          input.maxLength = 3;
+          input.value = member.party || "";
+          partyTd.appendChild(input);
+        } else {
+          partyTd.textContent = member.party || "";
+        }
+        tr.appendChild(partyTd);
+
+        // --- lifetime score (read-only, from backend) ---
+        const lifetimeTd = document.createElement("td");
+        lifetimeTd.textContent =
+          member.lifetimeScore !== null && member.lifetimeScore !== undefined
+            ? (member.lifetimeScore.toFixed
+                ? member.lifetimeScore.toFixed(1)
+                : member.lifetimeScore) + " %"
+            : "–";
+        tr.appendChild(lifetimeTd);
+
+        // --- current score ---
+        const currentTd = document.createElement("td");
+        currentTd.textContent =
+          member.currentScore !== null && member.currentScore !== undefined
+            ? (member.currentScore.toFixed
+                ? member.currentScore.toFixed(1)
+                : member.currentScore) + " %"
+            : "–";
+        tr.appendChild(currentTd);
+
+        // --- trending cell ---
+        const trendingTd = document.createElement("td");
+        if (isEditing && isAdmin) {
+          const label = document.createElement("label");
+          label.style.display = "inline-flex";
+          label.style.alignItems = "center";
+          label.style.gap = "0.25rem";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.name = "trending";
+          cb.checked = !!member.trending;
+          label.appendChild(cb);
+          const span = document.createElement("span");
+          span.textContent = "Trending 🔥";
+          label.appendChild(span);
+          trendingTd.appendChild(label);
+        } else {
+          if (member.trending) {
+            const span = document.createElement("span");
+            span.className = "tag-pill";
+            span.textContent = "Trending 🔥";
+            trendingTd.appendChild(span);
+          } else {
+            trendingTd.textContent = "";
+          }
+        }
+        tr.appendChild(trendingTd);
+
+        // --- actions ---
+        const actionsTd = document.createElement("td");
+        actionsTd.className = "actions-cell";
+
+        // View profile (everyone)
+        const viewBtn = document.createElement("button");
+        viewBtn.type = "button";
+        viewBtn.className = "secondary";
+        viewBtn.dataset.action = "view";
+        viewBtn.textContent = "View";
+        actionsTd.appendChild(viewBtn);
+
+        if (isAdmin) {
+          if (isEditing) {
+            const saveBtn = document.createElement("button");
+            saveBtn.type = "button";
+            saveBtn.dataset.action = "save";
+            saveBtn.textContent = "Save";
+            actionsTd.appendChild(saveBtn);
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.type = "button";
+            cancelBtn.className = "secondary";
+            cancelBtn.dataset.action = "cancel";
+            cancelBtn.textContent = "Cancel";
+            actionsTd.appendChild(cancelBtn);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "danger";
+            removeBtn.dataset.action = "remove";
+            removeBtn.textContent = "Delete";
+            actionsTd.appendChild(removeBtn);
+          } else {
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.dataset.action = "edit";
+            editBtn.textContent = "Edit";
+            actionsTd.appendChild(editBtn);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "danger";
+            removeBtn.dataset.action = "remove";
+            removeBtn.textContent = "Delete";
+            actionsTd.appendChild(removeBtn);
+          }
+        }
+
+        tr.appendChild(actionsTd);
+
+        tbody.appendChild(tr);
+      });
+
+      renderPagination(total, start, end);
+    }
+
+    function renderPagination(total, startIndex, endIndex) {
       paginationEl.innerHTML = "";
+      if (total === 0) {
+        return;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
       const infoSpan = document.createElement("span");
-      const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-      const end = Math.min(currentPage * pageSize, total);
-      infoSpan.textContent = total
-        ? `Showing ${start}-${end} of ${total}`
-        : "No results";
+      infoSpan.textContent = `Showing ${startIndex + 1}-${endIndex} of ${total}`;
       paginationEl.appendChild(infoSpan);
 
       const controls = document.createElement("div");
@@ -634,7 +908,7 @@
       };
       controls.appendChild(prevBtn);
 
-      for (let p = 1; p <= pageCount; p++) {
+      for (let p = 1; p <= totalPages; p++) {
         const btn = document.createElement("button");
         btn.textContent = p;
         if (p === currentPage) btn.classList.add("current");
@@ -647,9 +921,9 @@
 
       const nextBtn = document.createElement("button");
       nextBtn.textContent = "Next";
-      nextBtn.disabled = currentPage === pageCount;
+      nextBtn.disabled = currentPage === totalPages;
       nextBtn.onclick = () => {
-        if (currentPage < pageCount) {
+        if (currentPage < totalPages) {
           currentPage++;
           renderTable();
         }
@@ -659,363 +933,14 @@
       paginationEl.appendChild(controls);
     }
 
-    function renderTable() {
-      const filtered = getFilteredMembers();
-      renderPagination(filtered);
-
-      tbody.innerHTML = "";
-
-      const total = filtered.length;
-      const pageCount = Math.max(1, Math.ceil(total / pageSize));
-      if (currentPage > pageCount) currentPage = pageCount;
-
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = Math.min(startIndex + pageSize, total);
-      const pageItems = filtered.slice(startIndex, endIndex);
-
-      pageItems.forEach((member) => {
-        const tr = document.createElement("tr");
-        tr.dataset.id = member.id;
-
-        const isEditing = isAdmin && editingIds.has(member.id);
-
-        if (isAdmin) {
-          tr.classList.add("draggable-row");
-          tr.setAttribute("draggable", "true");
-        } else {
-          tr.classList.remove("draggable-row");
-          tr.removeAttribute("draggable");
-        }
-
-        const photoDisplay = `
-          <div class="photo-cell">
-            <div class="photo-wrapper">
-              ${
-                member.imageData
-                  ? `<img src="${member.imageData}" alt="${member.name}">`
-                  : `<div class="placeholder">No photo</div>`
-              }
-              ${member.trending ? '<span class="trending-icon">🔥</span>' : ""}
-            </div>
-            ${
-              isEditing
-                ? `<input type="file" name="photo" accept="image/*">`
-                : ""
-            }
-          </div>
-        `;
-
-        const nameCell = isEditing
-          ? `<input type="text" name="name" value="${member.name || ""}" />`
-          : `<a href="member.html?id=${member.id}" class="name-link">${member.name || ""}</a>`;
-
-        const chamberCell = isEditing
-          ? `<select name="chamber">
-               <option value="House" ${
-                 member.chamber === "House" ? "selected" : ""
-               }>House</option>
-               <option value="Senate" ${
-                 member.chamber === "Senate" ? "selected" : ""
-               }>Senate</option>
-             </select>`
-          : `<span class="display-text">${member.chamber || ""}</span>`;
-
-        const stateCell = isEditing
-          ? `<input type="text" name="state" maxlength="2" value="${
-              member.state || ""
-            }" />`
-          : `<span class="display-text">${member.state || ""}</span>`;
-
-        const partyCell = isEditing
-          ? `<input type="text" name="party" maxlength="3" value="${
-              member.party || ""
-            }" />`
-          : `<span class="display-text">${member.party || ""}</span>`;
-
-        const lifetimeCell =
-          `<span class="display-text">${member.lifetimeScore ?? ""}</span>`;
-
-        const currentCell =
-          `<span class="display-text">${member.currentScore ?? ""}</span>`;
-
-        const actionsCell = isAdmin
-          ? `
-            <div class="row-actions">
-              <button type="button"
-                      class="edit-btn ${isEditing ? "editing" : ""}"
-                      data-action="toggle-edit">
-                ${isEditing ? "Done" : "Edit"}
-              </button>
-              <button type="button"
-                      class="trend-btn ${member.trending ? "on" : ""}"
-                      data-action="toggle-trending">
-                Trending 🔥
-              </button>
-              ${
-                isEditing
-                  ? `<button type="button"
-                            class="remove-btn"
-                            data-action="remove">
-                       Remove
-                     </button>`
-                  : ""
-              }
-            </div>
-          `
-          : "";
-
-        tr.innerHTML = `
-          <td>${photoDisplay}</td>
-          <td>${nameCell}</td>
-          <td>${chamberCell}</td>
-          <td>${stateCell}</td>
-          <td>${partyCell}</td>
-          <td>${lifetimeCell}</td>
-          <td>${currentCell}</td>
-          <td>${actionsCell}</td>
-        `;
-
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function loadMembers() {
-      const res = await fetch(API_BASE + "/api/members");
-      members = await res.json();
-      // sort by position just in case
-      members.sort((a, b) => {
-        const pa = a.position ?? 999999;
-        const pb = b.position ?? 999999;
-        if (pa !== pb) return pa - pb;
-        return (a.name || "").localeCompare(b.name || "");
-      });
-      currentPage = 1;
-      renderTable();
-    }
-
-    function handleUnauthorized() {
-      token = null;
-      localStorage.removeItem("afToken");
-      isAdmin = false;
-      editingIds.clear();
-      updateAdminUI();
-      alert("Your admin session expired or the server restarted. Please log in again.");
-    }
-
-    async function addMember() {
-      if (!isAdmin || !token) return;
-      const res = await fetch(API_BASE + "/api/members", {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({})
-      });
-      if (res.status === 401) return handleUnauthorized();
-      const member = await res.json();
-      members.push(member);
-      editingIds.add(member.id);
-      currentPage = Math.ceil(members.length / pageSize);
-      renderTable();
-    }
-
-    async function updateMember(id, updates) {
-      if (!isAdmin || !token) return;
-      const res = await fetch(API_BASE + "/api/members/" + id, {
-        method: "PUT",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify(updates)
-      });
-      if (res.status === 401) return handleUnauthorized();
-      const updated = await res.json();
-      const idx = members.findIndex((m) => m.id === id);
-      if (idx !== -1) {
-        members[idx] = updated;
-        renderTable();
-      }
-    }
-
-    async function deleteMember(id) {
-      if (!isAdmin || !token) return;
-      const res = await fetch(API_BASE + "/api/members/" + id, {
-        method: "DELETE",
-        headers: authHeaders()
-      });
-      if (res.status === 401) return handleUnauthorized();
-      members = members.filter((m) => m.id !== id);
-      editingIds.delete(id);
-      if ((currentPage - 1) * pageSize >= members.length) {
-        currentPage = Math.max(1, Math.ceil(members.length / pageSize));
-      }
-      renderTable();
-    }
-
-    async function saveOrderToServer() {
-      if (!isAdmin || !token) return;
-      const ids = members.map((m) => m.id);
-      const res = await fetch(API_BASE + "/api/members/reorder", {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ ids })
-      });
-      if (res.status === 401) return handleUnauthorized();
-    }
-
-    // table events
-
-    // update fields on change / blur (no "every key" glitch)
-    tbody.addEventListener("change", (e) => {
-      if (!isAdmin) return;
-      const target = e.target;
-
-      if (target.tagName === "INPUT" || target.tagName === "SELECT") {
-        if (target.type === "file") return; // handled separately
-        const row = target.closest("tr");
-        if (!row) return;
-        const id = row.dataset.id;
-        const field = target.name;
-        let value = target.value;
-
-        if (field === "lifetimeScore" || field === "currentScore") {
-          value = value === "" ? null : parseFloat(value);
-        }
-        updateMember(id, { [field]: value });
-      }
-    });
-
-    tbody.addEventListener("blur", (e) => {
-      if (!isAdmin) return;
-      const target = e.target;
-      if (
-        !(
-          target.tagName === "INPUT" ||
-          target.tagName === "SELECT"
-        )
-      ) {
-        return;
-      }
-      if (target.type === "file") return;
-      const row = target.closest("tr");
-      if (!row) return;
-      const id = row.dataset.id;
-      const field = target.name;
-      let value = target.value;
-      if (field === "lifetimeScore" || field === "currentScore") {
-        value = value === "" ? null : parseFloat(value);
-      }
-      updateMember(id, { [field]: value });
-    }, true);
-
-    tbody.addEventListener("click", (e) => {
-      if (!isAdmin) return;
-      const btn = e.target.closest("button");
-      if (!btn) return;
-
-      const row = btn.closest("tr");
-      if (!row) return;
-      const id = row.dataset.id;
-      const action = btn.dataset.action;
-
-      if (action === "toggle-edit") {
-        if (editingIds.has(id)) {
-          editingIds.delete(id);
-        } else {
-          editingIds.add(id);
-        }
-        renderTable();
-      } else if (action === "toggle-trending") {
-        const member = members.find((m) => m.id === id);
-        if (!member) return;
-        updateMember(id, { trending: !member.trending });
-      } else if (action === "remove") {
-        if (confirm("Remove this member?")) {
-          deleteMember(id);
-        }
-      }
-    });
-
-    // file upload
-    tbody.addEventListener("change", (e) => {
-      if (!isAdmin) return;
-      const input = e.target;
-      if (input.type === "file" && input.name === "photo") {
-        const row = input.closest("tr");
-        const id = row.dataset.id;
-        const file = input.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function (ev) {
-          const dataUrl = ev.target.result;
-          updateMember(id, { imageData: dataUrl });
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    // drag & drop reordering
-    let dragSrcId = null;
-
-    tbody.addEventListener("dragstart", (e) => {
-      if (!isAdmin) return;
-      const row = e.target.closest("tr.draggable-row");
-      if (!row) return;
-      dragSrcId = row.dataset.id;
-      e.dataTransfer.effectAllowed = "move";
-    });
-
-    tbody.addEventListener("dragover", (e) => {
-      if (!isAdmin) return;
-      const row = e.target.closest("tr.draggable-row");
-      if (!row) return;
-      e.preventDefault();
-      row.classList.add("drag-over");
-    });
-
-    tbody.addEventListener("dragleave", (e) => {
-      const row = e.target.closest("tr.draggable-row");
-      if (!row) return;
-      row.classList.remove("drag-over");
-    });
-
-    tbody.addEventListener("drop", async (e) => {
-      if (!isAdmin) return;
-      e.preventDefault();
-      const row = e.target.closest("tr.draggable-row");
-      if (!row) return;
-      row.classList.remove("drag-over");
-
-      const targetId = row.dataset.id;
-      if (!dragSrcId || dragSrcId === targetId) return;
-
-      const srcIndex = members.findIndex((m) => m.id === dragSrcId);
-      const targetIndex = members.findIndex((m) => m.id === targetId);
-      if (srcIndex === -1 || targetIndex === -1) return;
-
-      const [moved] = members.splice(srcIndex, 1);
-      members.splice(targetIndex, 0, moved);
-
-      await saveOrderToServer();
-      renderTable();
-    });
-
-    addMemberBtn.addEventListener("click", addMember);
-    searchInput.addEventListener("input", () => {
-      currentPage = 1;
-      renderTable();
-    });
-    chamberFilter.addEventListener("change", () => {
-      currentPage = 1;
-      renderTable();
-    });
-
-    // admin login
+    // --- Admin login logic ---
     adminToggleBtn.addEventListener("click", () => {
       if (isAdmin) {
+        // logout
         token = null;
-        isAdmin = false;
         localStorage.removeItem("afToken");
-        editingIds.clear();
+        isAdmin = false;
         updateAdminUI();
-        renderTable();
       } else {
         adminError.textContent = "";
         adminPasswordInput.value = "";
@@ -1039,19 +964,20 @@
     adminLoginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const password = adminPasswordInput.value || "";
-      adminError.textContent = "";
+      if (!password) {
+        adminError.textContent = "Password required.";
+        return;
+      }
       try {
         const res = await fetch(API_BASE + "/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password })
+          body: JSON.stringify({ password }),
         });
-
         if (!res.ok) {
-          adminError.textContent = "Incorrect password.";
+          adminError.textContent = "Invalid password.";
           return;
         }
-
         const data = await res.json();
         token = data.token;
         localStorage.setItem("afToken", token);
@@ -1059,19 +985,309 @@
         adminLoginPanel.classList.remove("active");
         adminError.textContent = "";
         updateAdminUI();
-        await loadMembers();
       } catch (err) {
-        adminError.textContent = "Login error. Try again.";
+        console.error("Error logging in:", err);
+        adminError.textContent = "Network error.";
       }
     });
 
-    // init
+    // --- Search & filter ---
+    searchInput.addEventListener("input", () => {
+      currentPage = 1;
+      renderTable();
+    });
+    chamberFilter.addEventListener("change", () => {
+      currentPage = 1;
+      renderTable();
+    });
+
+    // --- Add member ---
+    if (addMemberBtn) {
+      addMemberBtn.addEventListener("click", async () => {
+        if (!isAdmin || !token) return;
+        try {
+          const res = await fetch(API_BASE + "/api/members", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+              name: "New Member",
+              chamber: "House",
+              state: "",
+              party: "",
+              imageData: null,
+              trending: false,
+            }),
+          });
+          if (!res.ok) {
+            alert("Error adding member.");
+            return;
+          }
+          const newMember = await res.json();
+          members.push(newMember);
+          currentPage = 1;
+          renderTable();
+        } catch (err) {
+          console.error("Error adding member:", err);
+          alert("Error adding member.");
+        }
+      });
+    }
+
+    // --- Sync from Congress.gov ---
+    if (syncMembersBtn) {
+      syncMembersBtn.addEventListener("click", async () => {
+        if (!isAdmin || !token) {
+          alert("You must be logged in as admin to sync members.");
+          return;
+        }
+        if (
+          !confirm(
+            "Sync all current Congress members from Congress.gov into the table?"
+          )
+        ) {
+          return;
+        }
+
+        syncMembersBtn.disabled = true;
+        const originalText = syncMembersBtn.textContent;
+        syncMembersBtn.textContent = "Syncing…";
+
+        try {
+          const res = await fetch(API_BASE + "/api/admin/sync-members", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Sync error:", res.status, text);
+            alert("Error syncing members. Check console logs.");
+          } else {
+            const data = await res.json();
+            alert(
+              `Sync complete.\nImported/updated approx. ${
+                data.importedCount ?? "?"
+              } members.`
+            );
+            await fetchMembers();
+          }
+        } catch (err) {
+          console.error("Sync request failed:", err);
+          alert("Network error while syncing members.");
+        } finally {
+          syncMembersBtn.disabled = false;
+          syncMembersBtn.textContent = originalText;
+        }
+      });
+    }
+
+    // --- Table actions (edit/save/cancel/remove/view) ---
+    tbody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const row = btn.closest("tr");
+      if (!row) return;
+      const id = row.dataset.id;
+      const member = members.find((m) => m.id === id);
+      if (!member) return;
+
+      if (action === "view") {
+        window.location.href = "member.html?id=" + encodeURIComponent(id);
+        return;
+      }
+
+      if (!isAdmin || !token) return;
+
+      if (action === "edit") {
+        editingId = id;
+        renderTable();
+        return;
+      }
+
+      if (action === "cancel") {
+        editingId = null;
+        delete pendingImageData[id];
+        renderTable();
+        return;
+      }
+
+      if (action === "remove") {
+        if (!confirm("Delete this member?")) return;
+        try {
+          const res = await fetch(API_BASE + "/api/members/" + encodeURIComponent(id), {
+            method: "DELETE",
+            headers: authHeaders(),
+          });
+          if (!res.ok) {
+            alert("Error deleting member.");
+            return;
+          }
+          members = members.filter((m) => m.id !== id);
+          editingId = null;
+          renderTable();
+        } catch (err) {
+          console.error("Error deleting member:", err);
+          alert("Error deleting member.");
+        }
+        return;
+      }
+
+      if (action === "save") {
+        const inputs = row.querySelectorAll("input, select");
+        const payload = {};
+        inputs.forEach((el) => {
+          if (el.name === "name") payload.name = el.value.trim();
+          if (el.name === "chamber") payload.chamber = el.value;
+          if (el.name === "state") payload.state = el.value.toUpperCase();
+          if (el.name === "party") payload.party = el.value.toUpperCase();
+          if (el.name === "trending") payload.trending = el.checked;
+        });
+
+        if (pendingImageData[id]) {
+          payload.imageData = pendingImageData[id];
+        }
+
+        try {
+          const res = await fetch(API_BASE + "/api/members/" + encodeURIComponent(id), {
+            method: "PUT",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            alert("Error saving member.");
+            return;
+          }
+          const updated = await res.json();
+          const idx = members.findIndex((m) => m.id === id);
+          if (idx !== -1) {
+            members[idx] = updated;
+          }
+          editingId = null;
+          delete pendingImageData[id];
+          renderTable();
+        } catch (err) {
+          console.error("Error saving member:", err);
+          alert("Error saving member.");
+        }
+      }
+    });
+
+    // --- Photo upload handling ---
+    tbody.addEventListener("change", (e) => {
+      const input = e.target;
+      if (!input.classList.contains("photo-input")) return;
+      const row = input.closest("tr");
+      if (!row) return;
+      const id = row.dataset.id;
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        pendingImageData[id] = ev.target.result;
+        const img = row.querySelector(".photo-wrapper img");
+        const placeholder = row.querySelector(".photo-placeholder");
+        if (placeholder) placeholder.remove();
+        if (img) {
+          img.src = ev.target.result;
+        } else {
+          const newImg = document.createElement("img");
+          newImg.src = ev.target.result;
+          row.querySelector(".photo-wrapper").appendChild(newImg);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // --- Drag & drop reorder (admin only) ---
+    tbody.addEventListener("dragstart", (e) => {
+      if (!isAdmin || editingId) return;
+      const tr = e.target.closest("tr");
+      if (!tr) return;
+      draggedId = tr.dataset.id;
+      tr.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+
+    tbody.addEventListener("dragend", (e) => {
+      const tr = e.target.closest("tr");
+      if (tr) tr.classList.remove("dragging");
+      draggedId = null;
+    });
+
+    tbody.addEventListener("dragover", (e) => {
+      if (!isAdmin || editingId || !draggedId) return;
+      e.preventDefault();
+      const afterElement = getDragAfterElement(tbody, e.clientY);
+      const draggable = [...tbody.querySelectorAll("tr")].find(
+        (row) => row.dataset.id === draggedId
+      );
+      if (!draggable) return;
+      if (afterElement == null) {
+        tbody.appendChild(draggable);
+      } else {
+        tbody.insertBefore(draggable, afterElement);
+      }
+    });
+
+    tbody.addEventListener("drop", async (e) => {
+      if (!isAdmin || editingId || !draggedId) return;
+      e.preventDefault();
+
+      // Rebuild members array in new order based on DOM
+      const rows = [...tbody.querySelectorAll("tr")];
+      const newOrderIds = rows.map((r) => r.dataset.id);
+      const idToMember = {};
+      members.forEach((m) => (idToMember[m.id] = m));
+      members = newOrderIds
+        .map((id) => idToMember[id])
+        .filter((m) => m != null);
+
+      try {
+        const res = await fetch(API_BASE + "/api/members/reorder", {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ ids: newOrderIds }),
+        });
+        if (!res.ok) {
+          console.error("Error saving reorder:", res.status);
+          alert("Error saving new order.");
+        }
+      } catch (err) {
+        console.error("Error reordering members:", err);
+        alert("Error saving new order.");
+      } finally {
+        renderTable();
+      }
+    });
+
+    function getDragAfterElement(container, y) {
+      const draggableElements = [
+        ...container.querySelectorAll("tr:not(.dragging)"),
+      ];
+
+      return draggableElements.reduce(
+        (closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+          } else {
+            return closest;
+          }
+        },
+        { offset: Number.NEGATIVE_INFINITY, element: null }
+      ).element;
+    }
+
+    // --- init ---
     (async function init() {
       if (token) {
-        isAdmin = true; // optimistic
+        isAdmin = true;
       }
       updateAdminUI();
-      await loadMembers();
+      await fetchMembers();
     })();
   </script>
 </body>
