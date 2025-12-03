@@ -11,7 +11,7 @@ const { Pool } = pkg;
 const app = express();
 
 // --- config ---
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me"; // set in Render
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me"; // set this in Render
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
@@ -23,7 +23,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }, // Render Postgres usually needs SSL
 });
 
-// --- middleware ---
+// --- helpers / middleware ---
 app.use(cors());
 app.use(express.json({ limit: "5mb" })); // allow image data URLs
 
@@ -45,6 +45,65 @@ function requireAdmin(req, res, next) {
   const token = getTokenFromReq(req);
   if (token && adminTokens.has(token)) return next();
   return res.status(401).json({ error: "Unauthorized" });
+}
+
+// --- scoring helper (GLOBAL) ---
+// Recompute lifetime and current Congress scores for a single member
+async function recomputeScoresForMember(memberId) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      b.af_position AS "afPosition",
+      mv.vote,
+      mv.is_current_congress AS "isCurrent"
+    FROM member_votes mv
+    JOIN bills b ON mv.bill_id = b.id
+    WHERE mv.member_id = $1
+  `,
+    [memberId]
+  );
+
+  let lifetimeCorrect = 0;
+  let lifetimeTotal = 0;
+  let currentCorrect = 0;
+  let currentTotal = 0;
+
+  for (const row of rows) {
+    const afPos = row.afPosition;
+    const vote = row.vote;
+
+    // Ignore unclassified / neutral bills
+    if (!afPos || afPos === "Neither") continue;
+
+    // Only count clear yes/no
+    if (vote !== "Approved" && vote !== "Opposed") continue;
+
+    const aligned =
+      (afPos === "America First" && vote === "Approved") ||
+      (afPos === "Anti-America First" && vote === "Opposed");
+
+    lifetimeTotal++;
+    if (aligned) lifetimeCorrect++;
+
+    if (row.isCurrent) {
+      currentTotal++;
+      if (aligned) currentCorrect++;
+    }
+  }
+
+  const lifetimeScore =
+    lifetimeTotal > 0 ? (lifetimeCorrect / lifetimeTotal) * 100 : null;
+  const currentScore =
+    currentTotal > 0 ? (currentCorrect / currentTotal) * 100 : null;
+
+  await pool.query(
+    `
+    UPDATE politicians
+    SET lifetime_score = $2, current_score = $3
+    WHERE id = $1
+  `,
+    [memberId, lifetimeScore, currentScore]
+  );
 }
 
 // --- DB bootstrap ---
@@ -95,65 +154,6 @@ async function initDb() {
     ADD COLUMN IF NOT EXISTS is_current_congress BOOLEAN DEFAULT FALSE;
   `);
 
-  async function recomputeScoresForMember(memberId) {
-  // Pull all this member's votes + associated bill classification
-  const { rows } = await pool.query(
-    `
-    SELECT
-      b.af_position AS "afPosition",
-      mv.vote,
-      mv.is_current_congress AS "isCurrent"
-    FROM member_votes mv
-    JOIN bills b ON mv.bill_id = b.id
-    WHERE mv.member_id = $1
-  `,
-    [memberId]
-  );
-
-  let lifetimeCorrect = 0;
-  let lifetimeTotal = 0;
-  let currentCorrect = 0;
-  let currentTotal = 0;
-
-  for (const row of rows) {
-    const afPos = row.afPosition;
-    const vote = row.vote;
-
-    // Ignore bills that are unclassified or "Neither"
-    if (!afPos || afPos === "Neither") continue;
-
-    // Only count clear Yes/No
-    if (vote !== "Approved" && vote !== "Opposed") continue;
-
-    const aligned =
-      (afPos === "America First" && vote === "Approved") ||
-      (afPos === "Anti-America First" && vote === "Opposed");
-
-    lifetimeTotal++;
-    if (aligned) lifetimeCorrect++;
-
-    if (row.isCurrent) {
-      currentTotal++;
-      if (aligned) currentCorrect++;
-    }
-  }
-
-  const lifetimeScore =
-    lifetimeTotal > 0 ? (lifetimeCorrect / lifetimeTotal) * 100 : null;
-  const currentScore =
-    currentTotal > 0 ? (currentCorrect / currentTotal) * 100 : null;
-
-  await pool.query(
-    `
-    UPDATE politicians
-    SET lifetime_score = $2, current_score = $3
-    WHERE id = $1
-  `,
-    [memberId, lifetimeScore, currentScore]
-  );
-}
-
-
   // Seed politicians the first time
   const { rows } = await pool.query("SELECT COUNT(*) AS count FROM politicians");
   const count = parseInt(rows[0].count, 10);
@@ -173,7 +173,6 @@ async function initDb() {
     console.log("Seeded initial politicians.");
   }
 }
-
 
 // --- routes ---
 
@@ -304,22 +303,19 @@ app.put("/api/members/:id", requireAdmin, async (req, res) => {
     return res.status(400).json({ error: "No valid fields to update" });
   }
 
-  const setClauses = [];
-  const values = [];
-  let idx = 1;
-
-  // map JS names to DB columns
   const fieldToColumn = {
     name: "name",
     chamber: "chamber",
     state: "state",
     party: "party",
-    lifetimeScore: "lifetime_score",
-    currentScore: "current_score",
     imageData: "image_data",
     trending: "trending",
     position: "position",
   };
+
+  const setClauses = [];
+  const values = [];
+  let idx = 1;
 
   for (const [key, value] of Object.entries(updates)) {
     setClauses.push(`${fieldToColumn[key]} = $${idx++}`);
@@ -425,20 +421,6 @@ app.post("/api/members/reorder", requireAdmin, async (req, res) => {
   }
 });
 
-// --- start ---
-const PORT = process.env.PORT || 3000;
-
-initDb()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log("AFScorecard server listening on port", PORT);
-    });
-  })
-  .catch((err) => {
-    console.error("Error initializing DB:", err);
-    process.exit(1);
-  });
-
 // get a single member by id (public)
 app.get("/api/members/:id", async (req, res) => {
   const { id } = req.params;
@@ -525,7 +507,7 @@ app.post("/api/bills", requireAdmin, async (req, res) => {
       title,
       chamber = null, // "House", "Senate", or null
       afPosition = null, // "America First", "Neither", "Anti-America First"
-      billDate = null, // string like "2024-06-15"
+      billDate = null, // "YYYY-MM-DD"
       description = null,
       govLink = null,
     } = req.body || {};
@@ -617,14 +599,20 @@ app.put("/api/bills/:id", requireAdmin, async (req, res) => {
   `;
 
   try {
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Bill not found" });
+    }
+
     // Recompute scores for all members who voted on this bill
-        const mRes = await pool.query(
-          `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
-          [id]
-        );
-        for (const row of mRes.rows) {
-          await recomputeScoresForMember(row.member_id);
-        }
+    const mRes = await pool.query(
+      `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
+      [id]
+    );
+    for (const row of mRes.rows) {
+      await recomputeScoresForMember(row.member_id);
+    }
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -637,37 +625,38 @@ app.put("/api/bills/:id", requireAdmin, async (req, res) => {
 app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
+    // collect affected members BEFORE cascade delete
+    const mRes = await pool.query(
+      `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
+      [id]
+    );
+
     const result = await pool.query(
-  `
-  DELETE FROM bills
-  WHERE id = $1
-  RETURNING
-    id,
-    title,
-    chamber,
-    af_position AS "afPosition",
-    bill_date AS "billDate",
-    description,
-    gov_link AS "govLink";
-`,
-  [id]
-);
+      `
+      DELETE FROM bills
+      WHERE id = $1
+      RETURNING
+        id,
+        title,
+        chamber,
+        af_position AS "afPosition",
+        bill_date AS "billDate",
+        description,
+        gov_link AS "govLink";
+    `,
+      [id]
+    );
 
-if (result.rows.length === 0) {
-  return res.status(404).json({ error: "Bill not found" });
-}
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Bill not found" });
+    }
 
-// All member_votes with this bill_id are removed by ON DELETE CASCADE,
-// so just recompute scores for affected members
-const mRes = await pool.query(
-  `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
-  [id]
-);
-for (const row of mRes.rows) {
-  await recomputeScoresForMember(row.member_id);
-}
+    // ON DELETE CASCADE removes member_votes; now recompute scores
+    for (const row of mRes.rows) {
+      await recomputeScoresForMember(row.member_id);
+    }
 
-res.json(result.rows[0]);
+    res.json(result.rows[0]);
   } catch (err) {
     console.error("Error deleting bill:", err);
     res.status(500).json({ error: "Server error" });
@@ -717,6 +706,7 @@ app.get("/api/members/:id/bills", async (req, res) => {
         b.gov_link AS "govLink",
         mv.id AS "voteId",
         mv.vote,
+        mv.is_current_congress AS "isCurrent",
         mv.created_at AS "createdAt"
       FROM member_votes mv
       JOIN bills b ON mv.bill_id = b.id
@@ -732,6 +722,7 @@ app.get("/api/members/:id/bills", async (req, res) => {
   }
 });
 
+// attach or update a vote for a member (admin)
 app.post("/api/members/:id/bills", requireAdmin, async (req, res) => {
   const { id: memberId } = req.params;
   const { billId, vote } = req.body || {};
@@ -775,5 +766,16 @@ app.post("/api/members/:id/bills", requireAdmin, async (req, res) => {
   }
 });
 
+// --- start ---
+const PORT = process.env.PORT || 3000;
 
-
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log("AFScorecard server listening on port", PORT);
+    });
+  })
+  .catch((err) => {
+    console.error("Error initializing DB:", err);
+    process.exit(1);
+  });
