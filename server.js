@@ -14,13 +14,11 @@ const app = express();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me";
 const DATABASE_URL = process.env.DATABASE_URL;
 const CONGRESS_API_KEY =
-  process.env.CONGRESS_API_KEY ||
-  "NUtl5kWwSI4bWZKgjAbWxwALpFfL3gHWFPrwh0P0"; // you can remove the fallback later
+  process.env.CONGRESS_API_KEY || "NUtl5kWwSI4bWZKgjAbWxwALpFfL3gHWFPrwh0P0";
 
 if (!DATABASE_URL) {
   console.error("DATABASE_URL is not set. Please add it in Render environment.");
 }
-
 if (!CONGRESS_API_KEY) {
   console.error("CONGRESS_API_KEY is not set. Congress auto-sync will fail.");
 }
@@ -30,7 +28,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// --- helper: recompute scores based on bills/votes ---
+// ===================
+//  SCORE RECOMPUTE
+// ===================
 async function recomputeScoresForMember(memberId) {
   const { rows } = await pool.query(
     `
@@ -54,10 +54,7 @@ async function recomputeScoresForMember(memberId) {
     const afPos = row.afPosition;
     const vote = row.vote;
 
-    // Ignore unclassified/"Neither"
     if (!afPos || afPos === "Neither") continue;
-
-    // Only count clear yes/no
     if (vote !== "Approved" && vote !== "Opposed") continue;
 
     const aligned =
@@ -88,16 +85,16 @@ async function recomputeScoresForMember(memberId) {
   );
 }
 
-// --- middleware ---
+// ===================
+//  MIDDLEWARE / STATIC
+// ===================
 app.use(cors());
-app.use(express.json({ limit: "5mb" })); // allow image data URLs
+app.use(express.json({ limit: "5mb" }));
 
-// static files
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
-// simple in-memory token store (admin sessions)
 const adminTokens = new Set();
 
 function getTokenFromReq(req) {
@@ -112,9 +109,10 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: "Unauthorized" });
 }
 
-// --- DB bootstrap ---
+// ===================
+//  DB BOOTSTRAP
+// ===================
 async function initDb() {
-  // politicians table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS politicians (
       id UUID PRIMARY KEY,
@@ -131,43 +129,35 @@ async function initDb() {
     );
   `);
 
-  // make sure bioguide_id exists on older deploys
   await pool.query(`
     ALTER TABLE politicians
     ADD COLUMN IF NOT EXISTS bioguide_id TEXT UNIQUE;
   `);
 
-  // global bills table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bills (
       id UUID PRIMARY KEY,
       title TEXT NOT NULL,
-      chamber TEXT,               -- "House", "Senate", or NULL/"Both"
-      af_position TEXT,           -- "America First", "Neither", "Anti-America First"
+      chamber TEXT,
+      af_position TEXT,
       bill_date DATE,
       description TEXT,
       gov_link TEXT
     );
   `);
 
-  // member_votes: link politician -> bill with their vote
   await pool.query(`
     CREATE TABLE IF NOT EXISTS member_votes (
       id UUID PRIMARY KEY,
       member_id UUID REFERENCES politicians(id) ON DELETE CASCADE,
       bill_id UUID REFERENCES bills(id) ON DELETE CASCADE,
-      vote TEXT,                  -- "Approved", "Opposed", "Abstained"
+      vote TEXT,
       created_at TIMESTAMPTZ DEFAULT now(),
+      is_current_congress BOOLEAN DEFAULT FALSE,
       CONSTRAINT member_votes_unique UNIQUE (member_id, bill_id)
     );
   `);
 
-  await pool.query(`
-    ALTER TABLE member_votes
-    ADD COLUMN IF NOT EXISTS is_current_congress BOOLEAN DEFAULT FALSE;
-  `);
-
-  // Seed politicians the first time
   const { rows } = await pool.query("SELECT COUNT(*) AS count FROM politicians");
   const count = parseInt(rows[0].count, 10);
   if (count === 0) {
@@ -191,13 +181,67 @@ async function initDb() {
 //  CONGRESS.GOV SYNC
 // ===================
 
-// Helper: fetch all current members from Congress.gov for a given Congress
-async function fetchCurrentMembersForCongress(congressNumber = 118) {
+// state full name -> 2-letter code
+const STATE_ABBREV = {
+  Alabama: "AL",
+  Alaska: "AK",
+  Arizona: "AZ",
+  Arkansas: "AR",
+  California: "CA",
+  Colorado: "CO",
+  Connecticut: "CT",
+  Delaware: "DE",
+  Florida: "FL",
+  Georgia: "GA",
+  Hawaii: "HI",
+  Idaho: "ID",
+  Illinois: "IL",
+  Indiana: "IN",
+  Iowa: "IA",
+  Kansas: "KS",
+  Kentucky: "KY",
+  Louisiana: "LA",
+  Maine: "ME",
+  Maryland: "MD",
+  Massachusetts: "MA",
+  Michigan: "MI",
+  Minnesota: "MN",
+  Mississippi: "MS",
+  Missouri: "MO",
+  Montana: "MT",
+  Nebraska: "NE",
+  Nevada: "NV",
+  "New Hampshire": "NH",
+  "New Jersey": "NJ",
+  "New Mexico": "NM",
+  "New York": "NY",
+  "North Carolina": "NC",
+  "North Dakota": "ND",
+  Ohio: "OH",
+  Oklahoma: "OK",
+  Oregon: "OR",
+  Pennsylvania: "PA",
+  "Rhode Island": "RI",
+  "South Carolina": "SC",
+  "South Dakota": "SD",
+  Tennessee: "TN",
+  Texas: "TX",
+  Utah: "UT",
+  Vermont: "VT",
+  Virginia: "VA",
+  Washington: "WA",
+  "West Virginia": "WV",
+  Wisconsin: "WI",
+  Wyoming: "WY",
+  "District of Columbia": "DC",
+};
+
+async function fetchAllCurrentMembersFromCongressGov() {
   if (!CONGRESS_API_KEY) {
     throw new Error("CONGRESS_API_KEY is missing");
   }
 
-  const baseUrl = `https://api.congress.gov/v3/member/congress/${congressNumber}`;
+  const baseUrl = "https://api.congress.gov/v3/member";
   const limit = 250;
   let offset = 0;
   let all = [];
@@ -206,22 +250,20 @@ async function fetchCurrentMembersForCongress(congressNumber = 118) {
     const url = new URL(baseUrl);
     url.searchParams.set("api_key", CONGRESS_API_KEY);
     url.searchParams.set("format", "json");
+    url.searchParams.set("currentMember", "true");
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
 
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      const text = await resp.text();
+    const res = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text();
       throw new Error(
-        `Congress.gov member request failed: ${resp.status} – ${text.slice(
-          0,
-          200
-        )}`
+        `Congress.gov member request failed: ${res.status} – ${text.slice(0, 200)}`
       );
     }
 
-    const data = await resp.json();
-    const members = Array.isArray(data.members) ? data.members : [];
+    const data = await res.json();
+    const members = data.members || [];
     all = all.concat(members);
 
     const pagination = data.pagination || {};
@@ -234,110 +276,91 @@ async function fetchCurrentMembersForCongress(congressNumber = 118) {
   return all;
 }
 
-// Normalize raw Congress.gov member objects into our schema
 function normalizeCongressMembers(rawMembers) {
   return rawMembers
     .map((wrapper) => {
-      const m = wrapper.member || wrapper; // handles both shapes
+      // some examples wrap under "member", some not
+      const m = wrapper.member || wrapper;
 
       const bioguideId = m.bioguideId || null;
 
-      const fullName =
-        m.fullName ||
-        [m.firstName, m.lastName].filter(Boolean).join(" ") ||
-        null;
-
-      // Chamber and status can live in different places depending on variant
-      const chamber =
-        m.chamber ||
-        m.latestStatus?.chamber ||
-        m.terms?.[m.terms.length - 1]?.chamber ||
-        null;
-
-      const state =
-        m.state ||
-        m.latestStatus?.state ||
-        m.terms?.[m.terms.length - 1]?.state ||
-        null;
-
-      const partyRaw =
-        m.party ||
-        m.partyName ||
-        m.latestStatus?.party ||
-        m.terms?.[m.terms.length - 1]?.party ||
-        null;
-
-      let party = partyRaw;
-      if (party) {
-        const p = party.toLowerCase();
-        if (p.startsWith("republican")) party = "R";
-        else if (p.startsWith("democrat")) party = "D";
-        else if (p.startsWith("independent")) party = "I";
-        else party = partyRaw.substring(0, 3).toUpperCase();
+      // m.name is "Last, First", convert to "First Last"
+      let name = m.name || "";
+      if (name.includes(",")) {
+        const [last, first] = name.split(",").map((s) => s.trim());
+        name = `${first} ${last}`.trim();
       }
 
-      let chamberNorm = chamber;
-      if (chamberNorm === "House of Representatives") chamberNorm = "House";
-      if (chamberNorm) {
-        chamberNorm =
-          chamberNorm.charAt(0).toUpperCase() +
-          chamberNorm.slice(1).toLowerCase();
+      const fullState = m.state || "";
+      const state = STATE_ABBREV[fullState] || null;
+
+      const partyName = (m.partyName || "").toLowerCase();
+      let party = null;
+      if (partyName.includes("republican")) party = "R";
+      else if (partyName.includes("democrat")) party = "D";
+      else if (partyName.includes("independent")) party = "I";
+
+      let chamber = null;
+      const termsField = m.terms;
+      let termsArr = [];
+      if (Array.isArray(termsField)) {
+        termsArr = termsField;
+      } else if (termsField && Array.isArray(termsField.item)) {
+        termsArr = termsField.item;
+      }
+      if (termsArr.length) {
+        const latest = termsArr[termsArr.length - 1];
+        const ch = latest.chamber || "";
+        if (ch.includes("House")) chamber = "House";
+        else if (ch.includes("Senate")) chamber = "Senate";
       }
 
-      const stateNorm = state ? state.toUpperCase() : null;
+      const imageUrl =
+        m.depiction && m.depiction.imageUrl ? m.depiction.imageUrl : null;
 
-      return {
-        bioguideId,
-        name: fullName,
-        chamber: chamberNorm,
-        state: stateNorm,
-        party,
-      };
+      return { bioguideId, name, state, party, chamber, imageUrl };
     })
     .filter(
       (m) =>
-        m.bioguideId &&
-        m.name &&
-        m.chamber &&
-        m.state &&
-        m.party
+        m.bioguideId && m.name && m.state && m.party && m.chamber
     );
 }
 
-// Admin-only endpoint to sync all current House/Senate members into politicians
+// Admin-only endpoint to sync members
 app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
   try {
-    const congressNumber = Number(req.body?.congress) || 118;
-
-    const rawMembers = await fetchCurrentMembersForCongress(congressNumber);
-    const normalized = normalizeCongressMembers(rawMembers);
+    const rawMembers = await fetchAllCurrentMembersFromCongressGov();
+    const members = normalizeCongressMembers(rawMembers);
 
     console.log(
-      `Congress sync: fetched ${rawMembers.length} raw, ${normalized.length} usable members.`
+      "Congress sync:",
+      "fetched",
+      rawMembers.length,
+      "raw,",
+      members.length,
+      "usable members."
     );
 
     const client = await pool.connect();
-    let importedCount = 0;
-    let updatedCount = 0;
-
     try {
       await client.query("BEGIN");
 
-      // Get current max position so new members go to the bottom
       const posRes = await client.query(
         "SELECT COALESCE(MAX(position), 0) AS maxpos FROM politicians"
       );
       let nextPosition = Number(posRes.rows[0].maxpos) || 0;
 
-      for (const m of normalized) {
-        // does this bioguide already exist?
+      let importedCount = 0;
+      let updatedCount = 0;
+
+      for (const m of members) {
         const existing = await client.query(
-          "SELECT id FROM politicians WHERE bioguide_id = $1",
+          "SELECT id, image_data FROM politicians WHERE bioguide_id = $1",
           [m.bioguideId]
         );
 
         if (existing.rows.length > 0) {
-          const id = existing.rows[0].id;
+          const { id, image_data } = existing.rows[0];
           await client.query(
             `
             UPDATE politicians
@@ -349,9 +372,9 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
           `,
             [id, m.name, m.chamber, m.state, m.party]
           );
+          // don't overwrite custom image_data
           updatedCount++;
         } else {
-          // insert new
           nextPosition += 1;
           const id = crypto.randomUUID();
           await client.query(
@@ -361,9 +384,9 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
                lifetime_score, current_score, image_data, trending, position)
             VALUES
               ($1, $2, $3, $4, $5, $6,
-               NULL, NULL, NULL, FALSE, $7)
+               NULL, NULL, $7, FALSE, $8)
           `,
-            [id, m.bioguideId, m.name, m.chamber, m.state, m.party, nextPosition]
+            [id, m.bioguideId, m.name, m.chamber, m.state, m.party, m.imageUrl, nextPosition]
           );
           importedCount++;
         }
@@ -372,10 +395,10 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
       await client.query("COMMIT");
       res.json({
         success: true,
-        imported: importedCount,
-        updated: updatedCount,
+        importedCount,
+        updatedCount,
         totalFromCongressApi: rawMembers.length,
-        usableMembers: normalized.length,
+        usableFromCongressApi: members.length,
       });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -393,8 +416,6 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
 // ===================
 //  AUTH
 // ===================
-
-// login -> returns token if password matches ADMIN_PASSWORD
 app.post("/api/login", (req, res) => {
   const { password } = req.body || {};
   if (!password) {
@@ -411,8 +432,6 @@ app.post("/api/login", (req, res) => {
 // ===================
 //  MEMBERS
 // ===================
-
-// get all members (public), ordered by position then name
 app.get("/api/members", async (req, res) => {
   try {
     const result = await pool.query(
@@ -440,7 +459,6 @@ app.get("/api/members", async (req, res) => {
   }
 });
 
-// add member (admin only)
 app.post("/api/members", requireAdmin, async (req, res) => {
   try {
     const {
@@ -453,7 +471,6 @@ app.post("/api/members", requireAdmin, async (req, res) => {
       bioguideId = null,
     } = req.body || {};
 
-    // get max position
     const { rows } = await pool.query(
       "SELECT COALESCE(MAX(position), 0) AS maxpos FROM politicians"
     );
@@ -502,7 +519,6 @@ app.post("/api/members", requireAdmin, async (req, res) => {
   }
 });
 
-// update member (admin only, partial update)
 app.put("/api/members/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
@@ -579,7 +595,6 @@ app.put("/api/members/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// delete member (admin only)
 app.delete("/api/members/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
@@ -612,7 +627,6 @@ app.delete("/api/members/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// bulk reorder (admin only) – for drag & drop
 app.post("/api/members/reorder", requireAdmin, async (req, res) => {
   const { ids } = req.body || {};
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -648,7 +662,6 @@ app.post("/api/members/reorder", requireAdmin, async (req, res) => {
   }
 });
 
-// get a single member by id (public)
 app.get("/api/members/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -684,10 +697,8 @@ app.get("/api/members/:id", async (req, res) => {
 });
 
 // ===================
-//  BILLS (GLOBAL)
+//  BILLS
 // ===================
-
-// list bills (public, optional ?chamber=House/Senate)
 app.get("/api/bills", async (req, res) => {
   const { chamber } = req.query;
   try {
@@ -732,7 +743,6 @@ app.get("/api/bills", async (req, res) => {
   }
 });
 
-// create a new bill (admin)
 app.post("/api/bills", requireAdmin, async (req, res) => {
   try {
     const {
@@ -774,7 +784,6 @@ app.post("/api/bills", requireAdmin, async (req, res) => {
   }
 });
 
-// update a bill globally (admin)
 app.put("/api/bills/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
@@ -837,7 +846,6 @@ app.put("/api/bills/:id", requireAdmin, async (req, res) => {
       return res.status(404).json({ error: "Bill not found" });
     }
 
-    // Recompute scores for all members who voted on this bill
     const mRes = await pool.query(
       `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
       [id]
@@ -853,11 +861,9 @@ app.put("/api/bills/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// delete a bill globally (admin)
 app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
-    // get affected members BEFORE delete (ON DELETE CASCADE will wipe votes)
     const mRes = await pool.query(
       `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
       [id]
@@ -895,10 +901,8 @@ app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
 });
 
 // ===================
-//  MEMBER <-> BILLS
+//  MEMBER ↔ BILLS
 // ===================
-
-// get a member's bills + votes (public)
 app.get("/api/members/:id/bills", async (req, res) => {
   const { id } = req.params;
   try {
@@ -930,7 +934,6 @@ app.get("/api/members/:id/bills", async (req, res) => {
   }
 });
 
-// add/update a member's vote on a bill (admin)
 app.post("/api/members/:id/bills", requireAdmin, async (req, res) => {
   const { id: memberId } = req.params;
   const { billId, vote } = req.body || {};
@@ -977,7 +980,6 @@ app.post("/api/members/:id/bills", requireAdmin, async (req, res) => {
   }
 });
 
-// remove a bill from a single member's record (admin)
 app.delete("/api/members/:id/bills/:billId", requireAdmin, async (req, res) => {
   const { id: memberId, billId } = req.params;
 
@@ -1004,7 +1006,9 @@ app.delete("/api/members/:id/bills/:billId", requireAdmin, async (req, res) => {
   }
 });
 
-// --- start ---
+// ===================
+//  START SERVER
+// ===================
 const PORT = process.env.PORT || 3000;
 
 initDb()
