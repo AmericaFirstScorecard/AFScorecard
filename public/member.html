@@ -668,6 +668,13 @@
                   <option value="Abstained">Abstained</option>
                 </select>
 
+                  <label style="display:flex;align-items:center;gap:0.35rem;margin-top:0.3rem;">
+                    <input type="checkbox" id="voteIsCurrent" />
+                    <span>Count towards current Congress score</span>
+                  </label>
+                
+                  <button type="submit" style="margin-top:0.4rem;">Add to Scorecard</button>
+
                 <button type="submit" style="margin-top:0.4rem;">Add to Scorecard</button>
               </form>
             </div>
@@ -1261,34 +1268,39 @@
       }
     }
 
-    async function attachOrUpdateVote(billId, vote) {
-      if (!isAdmin || !token) return;
-      try {
-        const res = await fetch(
-          API_BASE + "/api/members/" + encodeURIComponent(memberId) + "/bills",
-          {
-            method: "POST",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ billId, vote }),
-          }
-        );
-
-        if (res.status === 401) {
-          alert("Admin session expired. Please log in again on the main page.");
-          return;
-        }
-
-        if (!res.ok) {
-          alert("Error saving vote.");
-          return;
-        }
-
-        await loadMemberVotes();
-      } catch (err) {
-        console.error("Error saving vote:", err);
-        alert("Error saving vote.");
-      }
+    async function attachOrUpdateVote(billId, vote, isCurrent) {
+  if (!isAdmin || !token) return;
+  try {
+    const payload = { billId, vote };
+    if (typeof isCurrent === "boolean") {
+      payload.isCurrent = isCurrent;
     }
+
+    const res = await fetch(
+      API_BASE + "/api/members/" + encodeURIComponent(memberId) + "/bills",
+      {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (res.status === 401) {
+      alert("Admin session expired. Please log in again on the main page.");
+      return;
+    }
+
+    if (!res.ok) {
+      alert("Error saving vote.");
+      return;
+    }
+
+    await loadMemberVotes();
+  } catch (err) {
+    console.error("Error saving vote:", err);
+    alert("Error saving vote.");
+  }
+}
 
     async function deleteMemberVote(billId) {
       if (!isAdmin || !token) return;
@@ -1325,17 +1337,19 @@
     async function handleAttachBill(e) {
       e.preventDefault();
       if (!isAdmin || !token) return;
-
+    
       const billId = document.getElementById("billSelect").value;
       const vote = document.getElementById("voteSelect").value;
-
+      const isCurrent = document.getElementById("voteIsCurrent").checked;
+    
       if (!billId) {
         alert("Select a bill first.");
         return;
       }
-
-      await attachOrUpdateVote(billId, vote);
+    
+      await attachOrUpdateVote(billId, vote, isCurrent);
     }
+
 
     function handleVotesClick(e) {
       if (!isAdmin || !token) return;
