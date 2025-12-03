@@ -201,8 +201,10 @@
     /* Right-align actions column on desktop */
     th.actions-col,
     td.actions-col {
-      text-align: right;
+      text-align: center;
+      width: 120px;       /* forces a consistent column width */
     }
+
 
     tbody tr:nth-child(even) {
       background: rgba(255, 255, 255, 0.01);
@@ -296,11 +298,13 @@
     }
 
     .actions-cell {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.3rem;
-      justify-content: flex-end; /* push buttons to the right */
-    }
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    justify-content: center;   /* center the View button under ACTIONS */
+    align-items: center;       /* vertical centering in the row */
+  }
+
 
     .actions-cell button {
       font-size: 0.78rem;
