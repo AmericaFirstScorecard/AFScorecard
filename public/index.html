@@ -109,10 +109,6 @@
       padding: 1.5rem;
     }
 
-    .card + .card {
-      margin-top: 1.5rem;
-    }
-
     .card-header {
       display: flex;
       flex-wrap: wrap;
@@ -167,11 +163,6 @@
       border-color: #ff6b81;
     }
 
-    button.small {
-      padding: 0.2rem 0.5rem;
-      font-size: 0.78rem;
-    }
-
     button:hover {
       filter: brightness(1.08);
     }
@@ -207,11 +198,30 @@
       color: #c9d3e8;
     }
 
-    /* Actions column alignment */
-    th.actions-col,
-    td.actions-col {
+    /* Actions column: width + centering */
+    th.actions-col {
       text-align: center;
-      width: 120px;
+      width: 140px;
+    }
+
+    td.actions-col {
+      width: 140px;
+    }
+
+    /* Center the View/Edit/Delete buttons in the cell */
+    .actions-cell {
+      text-align: center;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+    }
+
+    .actions-cell button {
+      font-size: 0.78rem;
+      padding: 0.25rem 0.6rem;
+      text-transform: none;
+      letter-spacing: 0;
+      white-space: nowrap;
+      margin: 0 0.1rem;
     }
 
     tbody tr:nth-child(even) {
@@ -303,21 +313,6 @@
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.3);
       background: rgba(4, 20, 45, 0.9);
-    }
-
-    .actions-cell {
-      display: flex;
-      flex-wrap: nowrap;
-      gap: 0.3rem;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .actions-cell button {
-      font-size: 0.78rem;
-      padding: 0.25rem 0.6rem;
-      text-transform: none;
-      letter-spacing: 0;
     }
 
     .footnote {
@@ -450,17 +445,6 @@
       min-height: 1rem;
     }
 
-    /* Docket table tweaks */
-    .docket-title {
-      max-width: 420px;
-      white-space: normal;
-    }
-
-    .docket-source {
-      font-size: 0.8rem;
-      opacity: 0.9;
-    }
-
     @media (max-width: 900px) {
       th:nth-child(4),
       td:nth-child(4),
@@ -489,7 +473,7 @@
         padding: 0.45rem 0.35rem;
       }
       .actions-cell {
-        justify-content: flex-start;
+        text-align: left; /* better on small screens */
       }
     }
   </style>
@@ -507,7 +491,6 @@
   </header>
 
   <main>
-    <!-- MEMBER SCORECARDS -->
     <section class="card">
       <div class="card-header">
         <h2>Member Scorecards</h2>
@@ -558,50 +541,13 @@
         the bills &amp; votes system.
       </p>
     </section>
-
-    <!-- ADMIN LEGISLATION DOCKET -->
-    <section class="card" id="docketCard" style="display:none;">
-      <div class="card-header">
-        <h2>Admin Legislation Docket</h2>
-        <div class="controls">
-          <button id="syncBillsBtn" class="secondary">
-            Sync Recent Bills (VoteSmart)
-          </button>
-          <button id="refreshDocketBtn">
-            Refresh Docket
-          </button>
-        </div>
-      </div>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Bill Date</th>
-              <th>Chamber</th>
-              <th>Title</th>
-              <th>Source</th>
-              <th class="actions-col">AF Rating</th>
-            </tr>
-          </thead>
-          <tbody id="docketTableBody"></tbody>
-        </table>
-      </div>
-
-      <p class="footnote">
-        The docket shows recent legislation that has not yet been graded as
-        America First, Neither, or Anti-America First. Grading a bill updates
-        its America First status and recalculates scores for any members
-        who have recorded votes on that bill.
-      </p>
-    </section>
   </main>
 
   <!-- Admin login modal -->
   <div class="admin-login-panel" id="adminLoginPanel">
     <div class="admin-login-card">
       <h3>Admin Login</h3>
-      <p>Enter the admin password to add/edit members and manage legislation.</p>
+      <p>Enter the admin password to add/edit members and sync Congress data.</p>
       <form id="adminLoginForm">
         <input
           type="password"
@@ -624,12 +570,11 @@
     const API_BASE = ""; // same origin
 
     let members = [];
-    let docketBills = [];
     let isAdmin = false;
     let editingId = null;
     let token = localStorage.getItem("afToken") || null;
     let currentPage = 1;
-    const pageSize = 70; // 70 politicians per page
+    const pageSize = 70; // <<< 70 per page
     let draggedId = null;
     const pendingImageData = {};
 
@@ -648,12 +593,6 @@
     const adminCancelBtn = document.getElementById("adminCancelBtn");
     const adminError = document.getElementById("adminError");
 
-    // Docket elements
-    const docketCard = document.getElementById("docketCard");
-    const docketTableBody = document.getElementById("docketTableBody");
-    const syncBillsBtn = document.getElementById("syncBillsBtn");
-    const refreshDocketBtn = document.getElementById("refreshDocketBtn");
-
     function authHeaders(extra = {}) {
       const headers = { ...extra };
       if (token) headers["Authorization"] = "Bearer " + token;
@@ -667,23 +606,17 @@
         adminToggleBtn.classList.add("admin-active");
         addMemberBtn.style.display = "inline-block";
         syncMembersBtn.style.display = "inline-block";
-        docketCard.style.display = "block";
       } else {
         adminStatus.textContent = "Viewer";
         adminToggleBtn.textContent = "Admin Login";
         adminToggleBtn.classList.remove("admin-active");
         addMemberBtn.style.display = "none";
         syncMembersBtn.style.display = "none";
-        docketCard.style.display = "none";
         editingId = null;
       }
       renderTable();
-      renderDocket();
     }
 
-    // =====================
-    // MEMBERS / SCORECARDS
-    // =====================
     async function fetchMembers() {
       try {
         const res = await fetch(API_BASE + "/api/members");
@@ -844,8 +777,7 @@
         // lifetime score
         const lifetimeTd = document.createElement("td");
         lifetimeTd.textContent =
-          member.lifetimeScore !== null &&
-          member.lifetimeScore !== undefined
+          member.lifetimeScore !== null && member.lifetimeScore !== undefined
             ? (member.lifetimeScore.toFixed
                 ? member.lifetimeScore.toFixed(1)
                 : member.lifetimeScore) + " %"
@@ -855,8 +787,7 @@
         // current score
         const currentTd = document.createElement("td");
         currentTd.textContent =
-          member.currentScore !== null &&
-          member.currentScore !== undefined
+          member.currentScore !== null && member.currentScore !== undefined
             ? (member.currentScore.toFixed
                 ? member.currentScore.toFixed(1)
                 : member.currentScore) + " %"
@@ -998,9 +929,7 @@
       paginationEl.appendChild(controls);
     }
 
-    // =====================
-    // ADMIN LOGIN
-    // =====================
+    // admin login
     adminToggleBtn.addEventListener("click", () => {
       if (isAdmin) {
         token = null;
@@ -1051,16 +980,13 @@
         adminLoginPanel.classList.remove("active");
         adminError.textContent = "";
         updateAdminUI();
-        await fetchDocket();
       } catch (err) {
         console.error("Error logging in:", err);
         adminError.textContent = "Network error.";
       }
     });
 
-    // =====================
-    // SEARCH & FILTER
-    // =====================
+    // search & filter
     searchInput.addEventListener("input", () => {
       currentPage = 1;
       renderTable();
@@ -1070,9 +996,7 @@
       renderTable();
     });
 
-    // =====================
-    // ADD MEMBER
-    // =====================
+    // add member
     if (addMemberBtn) {
       addMemberBtn.addEventListener("click", async () => {
         if (!isAdmin || !token) return;
@@ -1104,9 +1028,7 @@
       });
     }
 
-    // =====================
-    // SYNC MEMBERS (CONGRESS)
-    // =====================
+    // sync members
     if (syncMembersBtn) {
       syncMembersBtn.addEventListener("click", async () => {
         if (!isAdmin || !token) {
@@ -1154,9 +1076,7 @@
       });
     }
 
-    // =====================
-    // ROW ACTIONS (MEMBERS)
-    // =====================
+    // row actions
     tbody.addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
       if (!btn) return;
@@ -1359,193 +1279,12 @@
       ).element;
     }
 
-    // =====================
-    // LEGISLATION DOCKET
-    // =====================
-    async function fetchDocket() {
-      if (!isAdmin || !token) return;
-      try {
-        const res = await fetch(API_BASE + "/api/admin/docket", {
-          headers: authHeaders(),
-        });
-        if (!res.ok) {
-          console.error("Error fetching docket:", res.status);
-          return;
-        }
-        docketBills = await res.json();
-        renderDocket();
-      } catch (err) {
-        console.error("Network error fetching docket:", err);
-      }
-    }
-
-    function renderDocket() {
-      docketTableBody.innerHTML = "";
-      if (!isAdmin) return;
-
-      docketBills.forEach((bill) => {
-        const tr = document.createElement("tr");
-        tr.dataset.id = bill.id;
-
-        const dateTd = document.createElement("td");
-        dateTd.textContent = bill.billDate
-          ? bill.billDate.slice(0, 10)
-          : "—";
-        tr.appendChild(dateTd);
-
-        const chamberTd = document.createElement("td");
-        chamberTd.textContent = bill.chamber || "";
-        tr.appendChild(chamberTd);
-
-        const titleTd = document.createElement("td");
-        titleTd.className = "docket-title";
-        if (bill.govLink) {
-          const a = document.createElement("a");
-          a.href = bill.govLink;
-          a.target = "_blank";
-          a.rel = "noopener noreferrer";
-          a.textContent = bill.title || "Untitled bill";
-          titleTd.appendChild(a);
-        } else {
-          titleTd.textContent = bill.title || "Untitled bill";
-        }
-        tr.appendChild(titleTd);
-
-        const sourceTd = document.createElement("td");
-        const src = bill.source || "Manual";
-        sourceTd.className = "docket-source";
-        sourceTd.textContent = src;
-        tr.appendChild(sourceTd);
-
-        const actionsTd = document.createElement("td");
-        actionsTd.className = "actions-cell actions-col";
-
-        const makeBtn = (label, value, className) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "small " + (className || "secondary");
-          btn.dataset.af = value;
-          btn.textContent = label;
-          return btn;
-        };
-
-        actionsTd.appendChild(
-          makeBtn("AF", "America First", "")
-        );
-        actionsTd.appendChild(
-          makeBtn("Neither", "Neither", "secondary")
-        );
-        actionsTd.appendChild(
-          makeBtn("Anti", "Anti-America First", "danger")
-        );
-
-        tr.appendChild(actionsTd);
-
-        docketTableBody.appendChild(tr);
-      });
-    }
-
-    docketTableBody.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button[data-af]");
-      if (!btn) return;
-      if (!isAdmin || !token) return;
-
-      const row = btn.closest("tr");
-      if (!row) return;
-      const id = row.dataset.id;
-      const afPosition = btn.dataset.af;
-
-      try {
-        const res = await fetch(
-          API_BASE + "/api/admin/bills/" + encodeURIComponent(id) + "/grade",
-          {
-            method: "POST",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ afPosition }),
-          }
-        );
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("Error grading bill:", res.status, text);
-          alert("Error grading bill.");
-          return;
-        }
-        // Remove graded bill from local docket list
-        docketBills = docketBills.filter((b) => b.id !== id);
-        renderDocket();
-      } catch (err) {
-        console.error("Network error grading bill:", err);
-        alert("Network error grading bill.");
-      }
-    });
-
-    if (refreshDocketBtn) {
-      refreshDocketBtn.addEventListener("click", async () => {
-        await fetchDocket();
-      });
-    }
-
-    if (syncBillsBtn) {
-      syncBillsBtn.addEventListener("click", async () => {
-        if (!isAdmin || !token) {
-          alert("You must be logged in as admin to sync bills.");
-          return;
-        }
-        if (
-          !confirm(
-            "Sync recent bills from VoteSmart and add any new ones to the docket (stopping at 2023)?"
-          )
-        ) {
-          return;
-        }
-
-        syncBillsBtn.disabled = true;
-        const original = syncBillsBtn.textContent;
-        syncBillsBtn.textContent = "Syncing…";
-
-        try {
-          const res = await fetch(
-            API_BASE + "/api/admin/sync-bills-votesmart",
-            {
-              method: "POST",
-              headers: authHeaders({ "Content-Type": "application/json" }),
-            }
-          );
-          if (!res.ok) {
-            const text = await res.text();
-            console.error("VoteSmart sync error:", res.status, text);
-            alert("Error syncing bills. Check server logs.");
-          } else {
-            const data = await res.json();
-            alert(
-              `Bill sync complete.\nInserted: ${data.inserted ?? "?"}\nUpdated: ${
-                data.updated ?? "?"
-              }`
-            );
-            await fetchDocket();
-          }
-        } catch (err) {
-          console.error("VoteSmart sync request failed:", err);
-          alert("Network error while syncing bills.");
-        } finally {
-          syncBillsBtn.disabled = false;
-          syncBillsBtn.textContent = original;
-        }
-      });
-    }
-
-    // =====================
-    // INIT
-    // =====================
     (async function init() {
       if (token) {
         isAdmin = true;
       }
       updateAdminUI();
       await fetchMembers();
-      if (isAdmin && token) {
-        await fetchDocket();
-      }
     })();
   </script>
 </body>
