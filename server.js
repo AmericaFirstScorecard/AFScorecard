@@ -126,65 +126,66 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: "Unauthorized" });
 }
 
+// --- state normalization helpers ---
+
 // Full state name -> 2-letter postal code
 const STATE_NAME_TO_ABBR = {
-  "ALABAMA": "AL",
-  "ALASKA": "AK",
-  "ARIZONA": "AZ",
-  "ARKANSAS": "AR",
-  "CALIFORNIA": "CA",
-  "COLORADO": "CO",
-  "CONNECTICUT": "CT",
-  "DELAWARE": "DE",
+  ALABAMA: "AL",
+  ALASKA: "AK",
+  ARIZONA: "AZ",
+  ARKANSAS: "AR",
+  CALIFORNIA: "CA",
+  COLORADO: "CO",
+  CONNECTICUT: "CT",
+  DELAWARE: "DE",
   "DISTRICT OF COLUMBIA": "DC",
-  "FLORIDA": "FL",
-  "GEORGIA": "GA",
-  "HAWAII": "HI",
-  "IDAHO": "ID",
-  "ILLINOIS": "IL",
-  "INDIANA": "IN",
-  "IOWA": "IA",
-  "KANSAS": "KS",
-  "KENTUCKY": "KY",
-  "LOUISIANA": "LA",
-  "MAINE": "ME",
-  "MARYLAND": "MD",
-  "MASSACHUSETTS": "MA",
-  "MICHIGAN": "MI",
-  "MINNESOTA": "MN",
-  "MISSISSIPPI": "MS",
-  "MISSOURI": "MO",
-  "MONTANA": "MT",
-  "NEBRASKA": "NE",
-  "NEVADA": "NV",
+  FLORIDA: "FL",
+  GEORGIA: "GA",
+  HAWAII: "HI",
+  IDAHO: "ID",
+  ILLINOIS: "IL",
+  INDIANA: "IN",
+  IOWA: "IA",
+  KANSAS: "KS",
+  KENTUCKY: "KY",
+  LOUISIANA: "LA",
+  MAINE: "ME",
+  MARYLAND: "MD",
+  MASSACHUSETTS: "MA",
+  MICHIGAN: "MI",
+  MINNESOTA: "MN",
+  MISSISSIPPI: "MS",
+  MISSOURI: "MO",
+  MONTANA: "MT",
+  NEBRASKA: "NE",
+  NEVADA: "NV",
   "NEW HAMPSHIRE": "NH",
   "NEW JERSEY": "NJ",
   "NEW MEXICO": "NM",
   "NEW YORK": "NY",
   "NORTH CAROLINA": "NC",
   "NORTH DAKOTA": "ND",
-  "OHIO": "OH",
-  "OKLAHOMA": "OK",
-  "OREGON": "OR",
-  "PENNSYLVANIA": "PA",
+  OHIO: "OH",
+  OKLAHOMA: "OK",
+  OREGON: "OR",
+  PENNSYLVANIA: "PA",
   "RHODE ISLAND": "RI",
   "SOUTH CAROLINA": "SC",
   "SOUTH DAKOTA": "SD",
-  "TENNESSEE": "TN",
-  "TEXAS": "TX",
-  "UTAH": "UT",
-  "VERMONT": "VT",
-  "VIRGINIA": "VA",
-  "WASHINGTON": "WA",
+  TENNESSEE: "TN",
+  TEXAS: "TX",
+  UTAH: "UT",
+  VERMONT: "VT",
+  VIRGINIA: "VA",
+  WASHINGTON: "WA",
   "WEST VIRGINIA": "WV",
-  "WISCONSIN": "WI",
-  "WYOMING": "WY"
+  WISCONSIN: "WI",
+  WYOMING: "WY",
 };
 
 function normalizeState(rawState) {
   if (!rawState) return null;
 
-  // Congress.gov is sending "ARIZONA", "Arizona", maybe "ARIZONA (AT LARGE)" etc
   if (typeof rawState === "string") {
     let val = rawState.trim();
     if (!val) return null;
@@ -206,7 +207,7 @@ function normalizeState(rawState) {
     }
   }
 
-  return null; // anything weird -> skip this member
+  return null; // anything weird -> store NULL in DB
 }
 
 // --- DB bootstrap ---
@@ -355,7 +356,10 @@ async function fetchAllCurrentMembersFromCongressGov() {
   return all;
 }
 
+// IMPORTANT: this is the fixed version so we actually keep members
 function normalizeCongressMembers(rawMembers) {
+  let debugShown = 0;
+
   const normalized = rawMembers
     .map((m) => {
       const bioguideId = m.bioguideId || null;
@@ -368,30 +372,23 @@ function normalizeCongressMembers(rawMembers) {
       // Try to pull *something* that represents the state, then normalize it
       const rawState =
         m.stateCode ||
-        (typeof m.state === "string" ? m.state : null) ||
-        (m.state && (m.state.code || m.state.postal)) ||
-        (m.roles && m.roles[0] && (m.roles[0].state || m.roles[0].stateCode)) ||
+        (m.state &&
+          (typeof m.state === "string"
+            ? m.state
+            : m.state.code || m.state.postal || m.state.name)) ||
+        (m.roles &&
+          m.roles[0] &&
+          (m.roles[0].stateCode || m.roles[0].state || m.roles[0].stateName)) ||
         null;
 
       const state = normalizeState(rawState);
 
-      // Chamber is nice to have but not required for scoring
-      let chamber =
-        m.chamber ||
-        (m.terms && m.terms[0] && m.terms[0].chamber) ||
-        (m.roles && m.roles[0] && m.roles[0].chamber) ||
-        null;
-
-      if (typeof chamber === "string") {
-        const lc = chamber.toLowerCase();
-        if (lc.includes("house")) chamber = "House";
-        else if (lc.includes("senate")) chamber = "Senate";
-      }
-
       let party =
         m.party ||
-        (m.terms && m.terms[0] && m.terms[0].party) ||
-        (m.roles && m.roles[0] && m.roles[0].party) ||
+        m.partyName ||
+        (m.roles &&
+          m.roles[0] &&
+          (m.roles[0].party || m.roles[0].partyName)) ||
         null;
 
       if (party) {
@@ -402,30 +399,41 @@ function normalizeCongressMembers(rawMembers) {
         else party = party.toUpperCase().slice(0, 3);
       }
 
+      let chamber =
+        m.chamber ||
+        (m.roles && m.roles[0] && m.roles[0].chamber) ||
+        null;
+
+      if (typeof chamber === "string") {
+        const lc = chamber.toLowerCase();
+        if (lc.includes("house")) chamber = "House";
+        else if (lc.includes("senate")) chamber = "Senate";
+      }
+
+      if (debugShown < 5) {
+        console.log("[normalizeCongressMembers] sample", {
+          bioguideId,
+          fullName,
+          rawState,
+          normalizedState: state,
+          party,
+          chamber,
+        });
+        debugShown++;
+      }
+
       return { bioguideId, name: fullName, chamber, state, party };
     })
-    .filter(
-      (m) =>
-        m.bioguideId &&
-        m.name &&
-        m.state &&              // must be a valid 2-letter code
-        m.state.length === 2 &&
-        m.party                 // party required for the UI
-      // we do NOT require chamber; if it's null we still insert
-    );
+    // Only require bioguideId + name.
+    // state/party/chamber are nice to have but not required.
+    .filter((m) => m.bioguideId && m.name);
 
-  if (normalized.length) {
-    console.log(
-      "Congress sync: usable normalized members:",
-      normalized.length,
-      "sample:",
-      normalized[0]
-    );
-  } else {
-    console.log(
-      "Congress sync: usable normalized members: 0 sample: undefined"
-    );
-  }
+  console.log(
+    "Congress sync: usable normalized members:",
+    normalized.length,
+    "sample:",
+    normalized[0]
+  );
 
   return normalized;
 }
@@ -455,6 +463,8 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
           [m.bioguideId]
         );
 
+        const safeState = m.state && m.state.length === 2 ? m.state : null;
+
         if (existing.rows.length > 0) {
           await client.query(
             `
@@ -465,7 +475,7 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
                 party = $5
             WHERE bioguide_id = $1
           `,
-            [m.bioguideId, m.name, m.chamber, m.state, m.party]
+            [m.bioguideId, m.name, m.chamber, safeState, m.party]
           );
           updatedCount++;
         } else {
@@ -480,7 +490,7 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
               ($1, $2, $3, $4, $5, $6,
                NULL, NULL, NULL, FALSE, $7)
           `,
-            [id, m.bioguideId, m.name, m.chamber, m.state, m.party, nextPosition]
+            [id, m.bioguideId, m.name, m.chamber, safeState, m.party, nextPosition]
           );
           importedCount++;
         }
@@ -1602,7 +1612,7 @@ app.delete(
         WHERE member_id = $1 AND bill_id = $2
         RETURNING id;
       `,
-      [memberId, billId]
+        [memberId, billId]
       );
 
       if (result.rows.length === 0) {
