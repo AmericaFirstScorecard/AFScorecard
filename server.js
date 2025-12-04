@@ -370,91 +370,97 @@ async function fetchAllCurrentMembersFromCongressGov() {
   return all;
 }
 
+// Cleaned up, robust normalizer
 function normalizeCongressMembers(rawMembers) {
-  const normalized = (rawMembers || []).map((m) => {
-    // bioguide ID is the key that lets us match votes later
-    const bioguideId =
-      m.bioguideId ||
-      (m.identifiers && m.identifiers.bioguideId) ||
-      null;
-
-    // Try multiple possible name shapes
-    let name =
-      m.nameKnown ||           // some Congress.gov payloads
-      m.fullName ||            // some payloads
-      m.nameOfficial ||        // some payloads
-      m.name ||                // sometimes a plain string
-      null;
-
-    // If name is an object like { first, last }
-    if (name && typeof name === "object") {
-      name =
-        [name.first, name.middle, name.last].filter(Boolean).join(" ") ||
+  const normalized = (rawMembers || [])
+    .map((m) => {
+      // bioguide ID is the key that lets us match votes later
+      const bioguideId =
+        m.bioguideId ||
+        (m.identifiers && m.identifiers.bioguideId) ||
         null;
-    }
 
-    if (!name) {
-      // last-ditch: first + last fields
-      name = [m.firstName, m.middleName, m.lastName]
-        .filter(Boolean)
-        .join(" ") || null;
-    }
+      // Try multiple possible name shapes
+      let name =
+        m.nameKnown || // some Congress.gov payloads
+        m.fullName || // some payloads
+        m.nameOfficial || // some payloads
+        m.name || // sometimes a plain string
+        null;
 
-    // State: we’ve seen it as a full name ("Washington") or codes
-    const rawState =
-      m.stateCode ||
-      (typeof m.state === "string" ? m.state : null) ||
-      (m.state && (m.state.code || m.state.postal)) ||
-      (m.roles && m.roles[0] && (m.roles[0].state || m.roles[0].stateCode)) ||
-      null;
+      // If name is an object like { first, last }
+      if (name && typeof name === "object") {
+        name =
+          [name.first, name.middle, name.last].filter(Boolean).join(" ") ||
+          null;
+      }
 
-    const state = normalizeState(rawState); // your helper
+      if (!name) {
+        // last-ditch: first + last fields
+        name =
+          [m.firstName, m.middleName, m.lastName].filter(Boolean).join(" ") ||
+          null;
+      }
 
-    // Party: don’t REQUIRE this to exist anymore
-    let party =
-      m.party ||
-      (m.currentParty && m.currentParty.name) ||
-      (m.roles && m.roles[0] && m.roles[0].party) ||
-      null;
+      // State: full name ("Washington") or codes
+      const rawState =
+        m.stateCode ||
+        (typeof m.state === "string" ? m.state : null) ||
+        (m.state && (m.state.code || m.state.postal)) ||
+        (m.roles &&
+          m.roles[0] &&
+          (m.roles[0].state || m.roles[0].stateCode)) ||
+        null;
 
-    if (party) {
-      const p = String(party).toLowerCase();
-      if (p.startsWith("republican")) party = "R";
-      else if (p.startsWith("democrat")) party = "D";
-      else if (p.startsWith("independent")) party = "I";
-      else party = String(party).toUpperCase().slice(0, 3);
-    }
+      const state = normalizeState(rawState);
 
-    // Chamber: nice to have, not required
-    let chamber =
-      m.chamber ||
-      (m.currentRole && m.currentRole.chamber) ||
-      (m.roles && m.roles[0] && m.roles[0].chamber) ||
-      null;
+      // Party: nice to have, but NOT required
+      let party =
+        m.party ||
+        (m.currentParty && m.currentParty.name) ||
+        (m.roles && m.roles[0] && m.roles[0].party) ||
+        null;
 
-    if (typeof chamber === "string") {
-      const lc = chamber.toLowerCase();
-      if (lc.includes("house")) chamber = "House";
-      else if (lc.includes("senate")) chamber = "Senate";
-    }
+      if (party) {
+        const p = String(party).toLowerCase();
+        if (p.startsWith("republican")) party = "R";
+        else if (p.startsWith("democrat")) party = "D";
+        else if (p.startsWith("independent")) party = "I";
+        else party = String(party).toUpperCase().slice(0, 3);
+      }
 
-    return {
-      bioguideId,
-      name,
-      state,
-      party,
-      chamber,
-    };
-  })
-  // NOTE: **we only require bioguideId + name + 2-letter state**
-  // Party *not* required anymore (this is what was killing everything before)
-  .filter(
-    (m) =>
-      m.bioguideId &&
-      m.name &&
-      m.state &&
-      m.state.length === 2
-  );
+      // Chamber: nice to have, not required
+      let chamber =
+        m.chamber ||
+        (m.currentRole && m.currentRole.chamber) ||
+        (m.roles && m.roles[0] && m.roles[0].chamber) ||
+        null;
+
+      if (typeof chamber === "string") {
+        const lc = chamber.toLowerCase();
+        if (lc.includes("house")) chamber = "House";
+        else if (lc.includes("senate")) chamber = "Senate";
+      }
+
+      return {
+        bioguideId,
+        name,
+        state,
+        party,
+        chamber,
+      };
+    })
+    // Only *hard* requirements now:
+    // - bioguideId
+    // - name
+    // - 2-letter state
+    .filter(
+      (m) =>
+        m.bioguideId &&
+        m.name &&
+        m.state &&
+        m.state.length === 2
+    );
 
   console.log(
     "[normalizeCongressMembers] usable:",
@@ -464,29 +470,6 @@ function normalizeCongressMembers(rawMembers) {
   );
 
   return normalized;
-}
-
-  // Debug samples so you can see what we're getting
-  mapped.slice(0, 25).forEach((m) =>
-    console.log("[normalizeCongressMembers] sample", m)
-  );
-
-  const usable = mapped.filter(
-    (m) => m.bioguideId && m.name && m.state && m.party
-  );
-
-  if (usable.length) {
-    console.log(
-      "Congress sync: usable normalized members:",
-      usable.length,
-      "sample:",
-      usable[0]
-    );
-  } else {
-    console.log("Congress sync: usable normalized members: 0 sample: undefined");
-  }
-
-  return usable;
 }
 
 // Admin-only endpoint to sync all current House/Senate members into politicians
@@ -703,7 +686,10 @@ async function fetchRecentBillsFromCongressGov() {
       if (!normalized) continue;
 
       // optional: skip future congress if you want only CURRENT_CONGRESS and below
-      if (normalized.congress && normalized.congress > CURRENT_CONGRESS) {
+      if (
+        normalized.congress &&
+        Number(normalized.congress) > Number(CURRENT_CONGRESS)
+      ) {
         continue;
       }
 
@@ -720,7 +706,12 @@ async function fetchRecentBillsFromCongressGov() {
     if (!pagination.next) break;
   }
 
-  console.log("Congress bill sync: normalized bills:", results.length);
+  console.log(
+    "Congress bill sync: normalized bills:",
+    results.length,
+    "sample:",
+    results[0]
+  );
   return results;
 }
 
