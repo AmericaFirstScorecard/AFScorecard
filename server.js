@@ -17,14 +17,15 @@ const CONGRESS_API_KEY =
   process.env.CONGRESS_API_KEY ||
   "NUtl5kWwSI4bWZKgjAbWxwALpFfL3gHWFPrwh0P0";
 
-// 119th Congress is treated as "current"
-const CURRENT_CONGRESS = 119;
+// We only care about bills from the 117th and 118th Congresses.
+// 118th is treated as "current" for score purposes.
+const CURRENT_CONGRESS = 118;
 
-// Minimum congress we want to import bills from (inclusive)
-// 117th Congress = Jan 2021–Jan 2023
+// Lowest congress we’ll import bills from (inclusive)
+// 117th Congress ≈ 2021–2023
 const MIN_BILL_CONGRESS = 117;
 
-// Don't import bills older than this date (acts as a safety cutoff)
+// Date cutoff as a safety; aligns with the start of the 117th Congress.
 const BILL_IMPORT_CUTOFF = new Date("2021-01-01T00:00:00Z");
 
 if (!DATABASE_URL) {
@@ -651,10 +652,14 @@ async function fetchRecentBillsFromCongressGov() {
 
   const baseUrl = "https://api.congress.gov/v3/bill";
   const limit = 50;
-  const maxPagesPerCongress = 20; // up to ~1000 bills per congress
+
+  // You asked for more than 1500 bills.
+  // 100 pages * 50 bills = up to 5000 bills per congress.
+  const maxPagesPerCongress = 100;
+
   const results = [];
 
-  // Loop from CURRENT_CONGRESS down to MIN_BILL_CONGRESS
+  // Loop from 118 down to 117, ignoring 119 completely.
   for (let congress = CURRENT_CONGRESS; congress >= MIN_BILL_CONGRESS; congress--) {
     let offset = 0;
     let stopThisCongress = false;
@@ -668,7 +673,7 @@ async function fetchRecentBillsFromCongressGov() {
       url.searchParams.set("limit", String(limit));
       url.searchParams.set("offset", String(offset));
       url.searchParams.set("sort", "latestActionDate+desc");
-      url.searchParams.set("congress", String(congress)); // ← key change
+      url.searchParams.set("congress", String(congress)); // ← restrict to that congress
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -698,7 +703,15 @@ async function fetchRecentBillsFromCongressGov() {
         const normalized = normalizeCongressBill(apiBill);
         if (!normalized) continue;
 
-        // Safety cutoff by date – will never chop 117+ with 2021 cutoff
+        // Safety: ignore anything somehow outside our congress window
+        if (
+          normalized.congress < MIN_BILL_CONGRESS ||
+          normalized.congress > CURRENT_CONGRESS
+        ) {
+          continue;
+        }
+
+        // Stop walking backward in time once we cross our date cutoff.
         if (normalized.billDate && normalized.billDate < BILL_IMPORT_CUTOFF) {
           stopThisCongress = true;
           console.log(
