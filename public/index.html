@@ -99,6 +99,9 @@
       margin: 1.5rem auto 2rem;
       padding: 0 1rem 2rem;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
     }
 
     .card {
@@ -208,7 +211,7 @@
       width: 140px;
     }
 
-    /* Center the View/Edit/Delete buttons in the cell */
+    /* Center the buttons in the cell */
     .actions-cell {
       text-align: center;
       padding-left: 0.25rem;
@@ -445,6 +448,21 @@
       min-height: 1rem;
     }
 
+    /* Bill docket-specific tweaks */
+    .bill-title {
+      max-width: 420px;
+      white-space: normal;
+    }
+
+    .bill-link a {
+      color: #9ecbff;
+      text-decoration: none;
+    }
+
+    .bill-link a:hover {
+      text-decoration: underline;
+    }
+
     @media (max-width: 900px) {
       th:nth-child(4),
       td:nth-child(4),
@@ -491,6 +509,7 @@
   </header>
 
   <main>
+    <!-- MEMBER SCORECARDS -->
     <section class="card">
       <div class="card-header">
         <h2>Member Scorecards</h2>
@@ -541,6 +560,51 @@
         the bills &amp; votes system.
       </p>
     </section>
+
+    <!-- BILL DOCKET -->
+    <section class="card" id="billDocket">
+      <div class="card-header">
+        <h2>America First Bill Docket</h2>
+        <div class="controls">
+          <select id="billYearFilter">
+            <option value="all">All Years</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+            <option value="2023">2023</option>
+          </select>
+          <select id="billChamberFilter">
+            <option value="all">All Chambers</option>
+            <option value="House">House</option>
+            <option value="Senate">Senate</option>
+          </select>
+          <button id="syncBillsBtn" style="display:none;">
+            Sync Recent Bills
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Title</th>
+              <th>Chamber</th>
+              <th>AF Rating</th>
+              <th>Link</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="billTableBody"></tbody>
+        </table>
+      </div>
+
+      <p class="footnote">
+        Admins can sync recent public bills from Congress.gov (back to 2023),
+        assign an America First rating, and those ratings feed into member
+        score calculations based on how they voted.
+      </p>
+    </section>
   </main>
 
   <!-- Admin login modal -->
@@ -569,12 +633,13 @@
   <script>
     const API_BASE = ""; // same origin
 
+    // --- MEMBERS STATE ---
     let members = [];
     let isAdmin = false;
     let editingId = null;
     let token = localStorage.getItem("afToken") || null;
     let currentPage = 1;
-    const pageSize = 70; // <<< 70 per page
+    const pageSize = 70; // 70 members per page
     let draggedId = null;
     const pendingImageData = {};
 
@@ -585,6 +650,14 @@
     const syncMembersBtn = document.getElementById("syncMembersBtn");
     const paginationEl = document.getElementById("pagination");
 
+    // --- BILLS STATE ---
+    let bills = [];
+    const billTableBody = document.getElementById("billTableBody");
+    const billYearFilter = document.getElementById("billYearFilter");
+    const billChamberFilter = document.getElementById("billChamberFilter");
+    const syncBillsBtn = document.getElementById("syncBillsBtn");
+
+    // --- ADMIN UI ELEMENTS ---
     const adminStatus = document.getElementById("adminStatus");
     const adminToggleBtn = document.getElementById("adminToggleBtn");
     const adminLoginPanel = document.getElementById("adminLoginPanel");
@@ -604,19 +677,25 @@
         adminStatus.textContent = "Admin";
         adminToggleBtn.textContent = "Logout";
         adminToggleBtn.classList.add("admin-active");
-        addMemberBtn.style.display = "inline-block";
-        syncMembersBtn.style.display = "inline-block";
+        if (addMemberBtn) addMemberBtn.style.display = "inline-block";
+        if (syncMembersBtn) syncMembersBtn.style.display = "inline-block";
+        if (syncBillsBtn) syncBillsBtn.style.display = "inline-block";
       } else {
         adminStatus.textContent = "Viewer";
         adminToggleBtn.textContent = "Admin Login";
         adminToggleBtn.classList.remove("admin-active");
-        addMemberBtn.style.display = "none";
-        syncMembersBtn.style.display = "none";
+        if (addMemberBtn) addMemberBtn.style.display = "none";
+        if (syncMembersBtn) syncMembersBtn.style.display = "none";
+        if (syncBillsBtn) syncBillsBtn.style.display = "none";
         editingId = null;
       }
       renderTable();
+      renderBillsTable();
     }
 
+    // -----------------
+    // MEMBERS FUNCTIONS
+    // -----------------
     async function fetchMembers() {
       try {
         const res = await fetch(API_BASE + "/api/members");
@@ -648,6 +727,8 @@
     }
 
     function renderTable() {
+      if (!tbody) return;
+
       const filtered = getFilteredMembers();
       const total = filtered.length;
       const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -879,6 +960,7 @@
     }
 
     function renderPagination(total, startIndex, endIndex) {
+      if (!paginationEl) return;
       paginationEl.innerHTML = "";
       if (total === 0) return;
 
@@ -929,7 +1011,143 @@
       paginationEl.appendChild(controls);
     }
 
-    // admin login
+    // -----------------
+    // BILLS FUNCTIONS
+    // -----------------
+    async function fetchBills() {
+      if (!billTableBody) return;
+      try {
+        const params = new URLSearchParams();
+        const chamberVal = billChamberFilter.value;
+        if (chamberVal && chamberVal !== "all") {
+          params.set("chamber", chamberVal);
+        }
+        const url =
+          API_BASE +
+          "/api/bills" +
+          (params.toString() ? "?" + params.toString() : "");
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error("Error fetching bills:", res.status);
+          return;
+        }
+        bills = await res.json();
+        renderBillsTable();
+      } catch (err) {
+        console.error("Network error fetching bills:", err);
+      }
+    }
+
+    function renderBillsTable() {
+      if (!billTableBody) return;
+      billTableBody.innerHTML = "";
+
+      const yearVal = billYearFilter.value || "all";
+      const chamberVal = billChamberFilter.value || "all";
+
+      const filteredBills = bills.filter((b) => {
+        let ok = true;
+        if (yearVal !== "all") {
+          const year = b.billDate ? new Date(b.billDate).getFullYear() : null;
+          if (!year || String(year) !== yearVal) ok = false;
+        }
+        if (ok && chamberVal !== "all" && b.chamber && b.chamber !== chamberVal) {
+          ok = false;
+        }
+        return ok;
+      });
+
+      filteredBills.forEach((bill) => {
+        const tr = document.createElement("tr");
+
+        // date
+        const dateTd = document.createElement("td");
+        if (bill.billDate) {
+          const d = new Date(bill.billDate);
+          if (!isNaN(d.getTime())) {
+            dateTd.textContent = d.toISOString().slice(0, 10);
+          } else {
+            dateTd.textContent = bill.billDate;
+          }
+        } else {
+          dateTd.textContent = "–";
+        }
+        tr.appendChild(dateTd);
+
+        // title
+        const titleTd = document.createElement("td");
+        titleTd.className = "bill-title";
+        const span = document.createElement("span");
+        span.textContent = bill.title || "(No title)";
+        titleTd.appendChild(span);
+        tr.appendChild(titleTd);
+
+        // chamber
+        const chamberTd = document.createElement("td");
+        chamberTd.textContent = bill.chamber || "";
+        tr.appendChild(chamberTd);
+
+        // AF rating
+        const ratingTd = document.createElement("td");
+        if (isAdmin) {
+          const select = document.createElement("select");
+          select.dataset.billId = bill.id;
+          const options = [
+            { value: "", label: "Not set" },
+            { value: "America First", label: "America First" },
+            { value: "Neither", label: "Neither" },
+            { value: "Anti-America First", label: "Anti-America First" },
+          ];
+          options.forEach((optDef) => {
+            const opt = document.createElement("option");
+            opt.value = optDef.value;
+            opt.textContent = optDef.label;
+            if ((bill.afPosition || "") === optDef.value) {
+              opt.selected = true;
+            }
+            select.appendChild(opt);
+          });
+          ratingTd.appendChild(select);
+        } else {
+          ratingTd.textContent = bill.afPosition || "Not set";
+        }
+        tr.appendChild(ratingTd);
+
+        // link
+        const linkTd = document.createElement("td");
+        linkTd.className = "bill-link";
+        if (bill.govLink) {
+          const a = document.createElement("a");
+          a.href = bill.govLink;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = "View Bill";
+          linkTd.appendChild(a);
+        } else {
+          linkTd.textContent = "—";
+        }
+        tr.appendChild(linkTd);
+
+        // actions
+        const actionsTd = document.createElement("td");
+        actionsTd.className = "actions-cell actions-col";
+        if (isAdmin) {
+          const saveBtn = document.createElement("button");
+          saveBtn.type = "button";
+          saveBtn.dataset.billAction = "saveRating";
+          saveBtn.dataset.billId = bill.id;
+          saveBtn.textContent = "Save Rating";
+          actionsTd.appendChild(saveBtn);
+        } else {
+          actionsTd.textContent = "";
+        }
+        tr.appendChild(actionsTd);
+
+        billTableBody.appendChild(tr);
+      });
+    }
+
+    // --- ADMIN LOGIN ---
     adminToggleBtn.addEventListener("click", () => {
       if (isAdmin) {
         token = null;
@@ -986,7 +1204,7 @@
       }
     });
 
-    // search & filter
+    // --- SEARCH/FILTER MEMBERS ---
     searchInput.addEventListener("input", () => {
       currentPage = 1;
       renderTable();
@@ -996,7 +1214,7 @@
       renderTable();
     });
 
-    // add member
+    // --- ADD MEMBER ---
     if (addMemberBtn) {
       addMemberBtn.addEventListener("click", async () => {
         if (!isAdmin || !token) return;
@@ -1028,7 +1246,7 @@
       });
     }
 
-    // sync members
+    // --- SYNC MEMBERS ---
     if (syncMembersBtn) {
       syncMembersBtn.addEventListener("click", async () => {
         if (!isAdmin || !token) {
@@ -1056,7 +1274,7 @@
           if (!res.ok) {
             const text = await res.text();
             console.error("Sync error:", res.status, text);
-            alert("Error syncing members. Check console logs.");
+            alert("Error syncing members. Check server logs.");
           } else {
             const data = await res.json();
             alert(
@@ -1076,7 +1294,56 @@
       });
     }
 
-    // row actions
+    // --- SYNC BILLS ---
+    if (syncBillsBtn) {
+      syncBillsBtn.addEventListener("click", async () => {
+        if (!isAdmin || !token) {
+          alert("You must be logged in as admin to sync bills.");
+          return;
+        }
+        if (
+          !confirm(
+            "Sync recent public bills from Congress.gov (from 2023 onward) into the docket?"
+          )
+        ) {
+          return;
+        }
+
+        syncBillsBtn.disabled = true;
+        const originalText = syncBillsBtn.textContent;
+        syncBillsBtn.textContent = "Syncing…";
+
+        try {
+          const res = await fetch(API_BASE + "/api/admin/sync-bills", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({}), // server uses defaults
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Bill sync error:", res.status, text);
+            alert("Error syncing bills. Check server logs.");
+          } else {
+            const data = await res.json();
+            alert(
+              `Bill sync complete.\nImported: ${
+                data.imported ?? "?"
+              }\nUpdated: ${data.updated ?? "?"}`
+            );
+            await fetchBills();
+          }
+        } catch (err) {
+          console.error("Bill sync request failed:", err);
+          alert("Network error while syncing bills.");
+        } finally {
+          syncBillsBtn.disabled = false;
+          syncBillsBtn.textContent = originalText;
+        }
+      });
+    }
+
+    // --- MEMBER ROW ACTIONS ---
     tbody.addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
       if (!btn) return;
@@ -1172,7 +1439,49 @@
       }
     });
 
-    // photo upload
+    // --- BILL ROW ACTIONS ---
+    billTableBody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-bill-action]");
+      if (!btn) return;
+      if (!isAdmin || !token) return;
+
+      const action = btn.dataset.billAction;
+      const billId = btn.dataset.billId;
+      if (!billId) return;
+
+      if (action === "saveRating") {
+        const select = billTableBody.querySelector(
+          `select[data-bill-id="${billId}"]`
+        );
+        const afPosition = select ? select.value || null : null;
+
+        try {
+          const res = await fetch(
+            API_BASE + "/api/bills/" + encodeURIComponent(billId),
+            {
+              method: "PUT",
+              headers: authHeaders({ "Content-Type": "application/json" }),
+              body: JSON.stringify({ afPosition }),
+            }
+          );
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Error updating bill:", res.status, text);
+            alert("Error saving bill rating.");
+            return;
+          }
+          const updated = await res.json();
+          const idx = bills.findIndex((b) => b.id === billId);
+          if (idx !== -1) bills[idx] = updated;
+          renderBillsTable();
+        } catch (err) {
+          console.error("Error saving bill rating:", err);
+          alert("Error saving bill rating.");
+        }
+      }
+    });
+
+    // --- PHOTO UPLOAD ---
     tbody.addEventListener("change", (e) => {
       const input = e.target;
       if (!input.classList.contains("photo-input")) return;
@@ -1199,7 +1508,7 @@
       reader.readAsDataURL(file);
     });
 
-    // drag & drop ordering
+    // --- DRAG & DROP ORDERING ---
     tbody.addEventListener("dragstart", (e) => {
       if (!isAdmin || editingId) return;
       const tr = e.target.closest("tr");
@@ -1279,12 +1588,21 @@
       ).element;
     }
 
+    // --- BILL FILTERS ---
+    billYearFilter.addEventListener("change", () => {
+      renderBillsTable();
+    });
+    billChamberFilter.addEventListener("change", () => {
+      fetchBills();
+    });
+
     (async function init() {
       if (token) {
         isAdmin = true;
       }
       updateAdminUI();
       await fetchMembers();
+      await fetchBills();
     })();
   </script>
 </body>
