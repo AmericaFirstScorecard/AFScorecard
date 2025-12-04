@@ -126,6 +126,89 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: "Unauthorized" });
 }
 
+// Full state name -> 2-letter postal code
+const STATE_NAME_TO_ABBR = {
+  "ALABAMA": "AL",
+  "ALASKA": "AK",
+  "ARIZONA": "AZ",
+  "ARKANSAS": "AR",
+  "CALIFORNIA": "CA",
+  "COLORADO": "CO",
+  "CONNECTICUT": "CT",
+  "DELAWARE": "DE",
+  "DISTRICT OF COLUMBIA": "DC",
+  "FLORIDA": "FL",
+  "GEORGIA": "GA",
+  "HAWAII": "HI",
+  "IDAHO": "ID",
+  "ILLINOIS": "IL",
+  "INDIANA": "IN",
+  "IOWA": "IA",
+  "KANSAS": "KS",
+  "KENTUCKY": "KY",
+  "LOUISIANA": "LA",
+  "MAINE": "ME",
+  "MARYLAND": "MD",
+  "MASSACHUSETTS": "MA",
+  "MICHIGAN": "MI",
+  "MINNESOTA": "MN",
+  "MISSISSIPPI": "MS",
+  "MISSOURI": "MO",
+  "MONTANA": "MT",
+  "NEBRASKA": "NE",
+  "NEVADA": "NV",
+  "NEW HAMPSHIRE": "NH",
+  "NEW JERSEY": "NJ",
+  "NEW MEXICO": "NM",
+  "NEW YORK": "NY",
+  "NORTH CAROLINA": "NC",
+  "NORTH DAKOTA": "ND",
+  "OHIO": "OH",
+  "OKLAHOMA": "OK",
+  "OREGON": "OR",
+  "PENNSYLVANIA": "PA",
+  "RHODE ISLAND": "RI",
+  "SOUTH CAROLINA": "SC",
+  "SOUTH DAKOTA": "SD",
+  "TENNESSEE": "TN",
+  "TEXAS": "TX",
+  "UTAH": "UT",
+  "VERMONT": "VT",
+  "VIRGINIA": "VA",
+  "WASHINGTON": "WA",
+  "WEST VIRGINIA": "WV",
+  "WISCONSIN": "WI",
+  "WYOMING": "WY"
+};
+
+function normalizeState(rawState) {
+  if (!rawState) return null;
+
+  // Congress.gov is sending "ARIZONA", "Arizona", maybe "ARIZONA (AT LARGE)" etc
+  if (typeof rawState === "string") {
+    let val = rawState.trim();
+    if (!val) return null;
+
+    // Already a 2-letter code?
+    if (val.length === 2) {
+      return val.toUpperCase();
+    }
+
+    const upper = val.toUpperCase();
+    const base = upper.split("(")[0].trim(); // strip " (At Large)" etc
+
+    if (base.length === 2) {
+      return base;
+    }
+
+    if (STATE_NAME_TO_ABBR[base]) {
+      return STATE_NAME_TO_ABBR[base];
+    }
+  }
+
+  return null; // anything weird -> skip this member
+}
+
 // --- DB bootstrap ---
 async function initDb() {
   // politicians table
@@ -273,101 +356,79 @@ async function fetchAllCurrentMembersFromCongressGov() {
 }
 
 function normalizeCongressMembers(rawMembers) {
-  if (!Array.isArray(rawMembers)) {
-    console.log("normalizeCongressMembers: rawMembers is not an array");
-    return [];
+  const normalized = rawMembers
+    .map((m) => {
+      const bioguideId = m.bioguideId || null;
+
+      const fullName =
+        m.fullName ||
+        [m.firstName, m.lastName].filter(Boolean).join(" ") ||
+        null;
+
+      // Try to pull *something* that represents the state, then normalize it
+      const rawState =
+        m.stateCode ||
+        (typeof m.state === "string" ? m.state : null) ||
+        (m.state && (m.state.code || m.state.postal)) ||
+        (m.roles && m.roles[0] && (m.roles[0].state || m.roles[0].stateCode)) ||
+        null;
+
+      const state = normalizeState(rawState);
+
+      // Chamber is nice to have but not required for scoring
+      let chamber =
+        m.chamber ||
+        (m.terms && m.terms[0] && m.terms[0].chamber) ||
+        (m.roles && m.roles[0] && m.roles[0].chamber) ||
+        null;
+
+      if (typeof chamber === "string") {
+        const lc = chamber.toLowerCase();
+        if (lc.includes("house")) chamber = "House";
+        else if (lc.includes("senate")) chamber = "Senate";
+      }
+
+      let party =
+        m.party ||
+        (m.terms && m.terms[0] && m.terms[0].party) ||
+        (m.roles && m.roles[0] && m.roles[0].party) ||
+        null;
+
+      if (party) {
+        const p = party.toLowerCase();
+        if (p.startsWith("republican")) party = "R";
+        else if (p.startsWith("democrat")) party = "D";
+        else if (p.startsWith("independent")) party = "I";
+        else party = party.toUpperCase().slice(0, 3);
+      }
+
+      return { bioguideId, name: fullName, chamber, state, party };
+    })
+    .filter(
+      (m) =>
+        m.bioguideId &&
+        m.name &&
+        m.state &&              // must be a valid 2-letter code
+        m.state.length === 2 &&
+        m.party                 // party required for the UI
+      // we do NOT require chamber; if it's null we still insert
+    );
+
+  if (normalized.length) {
+    console.log(
+      "Congress sync: usable normalized members:",
+      normalized.length,
+      "sample:",
+      normalized[0]
+    );
+  } else {
+    console.log(
+      "Congress sync: usable normalized members: 0 sample: undefined"
+    );
   }
 
-  const normalized = rawMembers.map((m) => {
-    // bioguideId is the key piece for wiring votes -> politicians
-    const bioguideId =
-      m.bioguideId ||
-      m.bioGuideId ||
-      (m.identifiers && (m.identifiers.bioguideId || m.identifiers.bioGuideId)) ||
-      (m.member && (m.member.bioguideId || m.member.bioGuideId)) ||
-      null;
-
-    // Name
-    const first =
-      m.firstName ||
-      m.first_name ||
-      (m.name && (m.name.first || m.name.given)) ||
-      m.givenName ||
-      "";
-    const last =
-      m.lastName ||
-      m.last_name ||
-      (m.name && (m.name.last || m.name.surname)) ||
-      m.familyName ||
-      "";
-
-    let fullName =
-      m.fullName ||
-      m.name ||
-      [first, last].filter(Boolean).join(" ").trim() ||
-      null;
-
-    // Chamber
-    let chamber =
-      m.chamber ||
-      (m.roles && m.roles[0] && m.roles[0].chamber) ||
-      (m.terms && m.terms[0] && m.terms[0].chamber) ||
-      null;
-
-    if (typeof chamber === "string") {
-      const c = chamber.toLowerCase();
-      if (c.includes("house")) chamber = "House";
-      else if (c.includes("senate")) chamber = "Senate";
-    }
-
-    // State
-    let state =
-      m.state ||
-      m.stateCode ||
-      (m.roles && m.roles[0] && m.roles[0].state) ||
-      (m.terms && m.terms[0] && m.terms[0].state) ||
-      null;
-    if (state) state = String(state).toUpperCase();
-
-    // Party
-    let party =
-      m.party ||
-      m.partyName ||
-      m.partyAffiliation ||
-      (m.roles && m.roles[0] && (m.roles[0].party || m.roles[0].partyName)) ||
-      (m.terms && m.terms[0] && (m.terms[0].party || m.terms[0].partyName)) ||
-      null;
-
-    if (party) {
-      const p = party.toLowerCase();
-      if (p.startsWith("republican")) party = "R";
-      else if (p.startsWith("democrat")) party = "D";
-      else if (p.startsWith("independent")) party = "I";
-      else party = party.toUpperCase();
-    }
-
-    return {
-      bioguideId,
-      name: fullName,
-      chamber,
-      state,
-      party,
-    };
-  });
-
-  // Only REQUIRE bioguide + name. Let chamber/state/party be null if API is weird.
-  const filtered = normalized.filter((m) => m.bioguideId && m.name);
-
-  console.log(
-    "Congress sync: usable normalized members:",
-    filtered.length,
-    "sample:",
-    filtered[0]
-  );
-
-  return filtered;
+  return normalized;
 }
-
 
 // Admin-only endpoint to sync all current House/Senate members into politicians
 app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
