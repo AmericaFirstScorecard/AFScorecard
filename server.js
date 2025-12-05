@@ -568,27 +568,37 @@ app.post("/api/admin/sync-members", requireAdmin, async (req, res) => {
 //   CONGRESS.GOV BILLS
 // -----------------------------
 
-// we only want to import these congresses
+// Only import these congresses
 const MIN_CONGRESS_TO_IMPORT = 117;
 const MAX_CONGRESS_TO_IMPORT = 118;
 
 // Normalize a single bill from Congress.gov
-function normalizeCongressBill(apiBill, congressOverride = null) {
+function normalizeCongressBill(apiBill, fallbackCongress = null) {
   if (!apiBill) return null;
 
-  // Congress number – prefer explicit override
+  // 1) Determine congress from the API payload; fall back to parameter
   let congress = null;
-  if (congressOverride != null) {
-    congress = Number(congressOverride);
-  } else if (apiBill.congress != null) {
+  if (apiBill.congress != null) {
     congress = Number(apiBill.congress);
   } else if (apiBill.congressNumber != null) {
     congress = Number(apiBill.congressNumber);
   } else if (apiBill.congressNum != null) {
     congress = Number(apiBill.congressNum);
+  } else if (fallbackCongress != null) {
+    congress = Number(fallbackCongress);
   }
 
-  // Type / number
+  // Only keep congress 117–118
+  if (
+    !congress ||
+    Number.isNaN(congress) ||
+    congress < MIN_CONGRESS_TO_IMPORT ||
+    congress > MAX_CONGRESS_TO_IMPORT
+  ) {
+    return null;
+  }
+
+  // 2) Type & number (required to build votes URL)
   const billTypeRaw =
     apiBill.type ||
     apiBill.billType ||
@@ -604,12 +614,11 @@ function normalizeCongressBill(apiBill, congressOverride = null) {
   const billNumber = billNumberRaw ? parseInt(billNumberRaw, 10) : null;
   const billType = billTypeRaw ? String(billTypeRaw).toLowerCase() : null;
 
-  // Hard requirement: congress + type + number
-  if (!congress || !billType || !billNumber) {
+  if (!billType || !billNumber) {
     return null;
   }
 
-  // Title
+  // 3) Title
   let title =
     apiBill.title ||
     apiBill.titleWithoutNumber ||
@@ -622,7 +631,7 @@ function normalizeCongressBill(apiBill, congressOverride = null) {
     title = `${String(billType).toUpperCase()} ${billNumber}`;
   }
 
-  // Latest action date -> billDate
+  // 4) Date (latest action or update)
   const latestAction =
     apiBill.latestAction ||
     apiBill.latestMajorAction ||
@@ -638,14 +647,14 @@ function normalizeCongressBill(apiBill, congressOverride = null) {
     billDate = new Date(apiBill.updateDate);
   }
 
-  // Link
+  // 5) Link
   const govLink =
     apiBill.url ||
     (latestAction && latestAction.url) ||
     apiBill.congressdotgov_url ||
     null;
 
-  // Chamber
+  // 6) Chamber
   let chamber =
     apiBill.originChamber ||
     apiBill.chamber ||
@@ -671,8 +680,8 @@ async function fetchBillsForCongress(congressNumber) {
   if (!CONGRESS_API_KEY) throw new Error("CONGRESS_API_KEY missing");
 
   const baseUrl = `https://api.congress.gov/v3/bill/${congressNumber}`;
-  const limit = 250;        // larger pages
-  const maxPages = 40;      // up to ~10k bills per congress
+  const limit = 250;   // bigger pages
+  const maxPages = 40; // up to ~10k bills per congress
   let offset = 0;
   const results = [];
 
@@ -684,16 +693,15 @@ async function fetchBillsForCongress(congressNumber) {
     url.searchParams.set("format", "json");
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
-    url.searchParams.set("sort", "updateDate+desc"); // most recent first
+    url.searchParams.set("sort", "updateDate+desc");
 
     const res = await fetch(url);
     if (!res.ok) {
       const text = await res.text();
       throw new Error(
-        `Congress.gov bill request (congress=${congressNumber}) failed: ${res.status} – ${text.slice(
-          0,
-          200
-        )}`
+        `Congress.gov bill request (congress=${congressNumber}) failed: ${
+          res.status
+        } – ${text.slice(0, 200)}`
       );
     }
 
@@ -710,10 +718,7 @@ async function fetchBillsForCongress(congressNumber) {
 
     for (const apiBill of apiBills) {
       const normalized = normalizeCongressBill(apiBill, congressNumber);
-      if (!normalized) continue;
-
-      // sanity check: keep only the congress we want
-      if (Number(normalized.congress) !== Number(congressNumber)) continue;
+      if (!normalized) continue; // this also drops any stray 119th bills
 
       results.push(normalized);
     }
@@ -729,13 +734,12 @@ async function fetchBillsForCongress(congressNumber) {
   return results;
 }
 
-// Fetch bills ONLY for congresses 117 and 118
+// Fetch bills for congresses 117 and 118 only
 async function fetchRecentBillsFromCongressGov() {
   if (!CONGRESS_API_KEY) throw new Error("CONGRESS_API_KEY missing");
 
   const combined = [];
 
-  // NOTE: we *intentionally* ignore any 119th-Congress bills here
   for (let c = MAX_CONGRESS_TO_IMPORT; c >= MIN_CONGRESS_TO_IMPORT; c--) {
     const billsForC = await fetchBillsForCongress(c);
     combined.push(...billsForC);
