@@ -1522,15 +1522,11 @@ app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
 });
 
 // -----------------------------
-//   ADMIN DOCKET (PAGINATED)
+//   ADMIN DOCKET
 // -----------------------------
 
-// GET /api/admin/docket?page=1&pageSize=50&congress=118&hasVotes=true
+// GET /api/admin/docket?limit=200&congress=118&hasVotes=true
 app.get("/api/admin/docket", requireAdmin, async (req, res) => {
-  const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-  const pageSizeRaw = parseInt(req.query.pageSize || "50", 10);
-  const pageSize = Math.min(Math.max(pageSizeRaw || 50, 1), 200);
-
   const congressFilter = req.query.congress
     ? parseInt(req.query.congress, 10)
     : null;
@@ -1544,16 +1540,18 @@ app.get("/api/admin/docket", requireAdmin, async (req, res) => {
   const params = [];
   let idx = 1;
 
-  // Congress filter: if provided, use it. Otherwise, default to CURRENT_CONGRESS and below.
+  // Default: only bills in our import range (117–118)
   if (!Number.isNaN(congressFilter) && congressFilter > 0) {
     whereParts.push(`congress = $${idx++}`);
     params.push(congressFilter);
   } else {
-    whereParts.push(`(congress IS NULL OR congress <= $${idx++})`);
-    params.push(CURRENT_CONGRESS);
+    whereParts.push(
+      `(congress BETWEEN $${idx++} AND $${idx++})`
+    );
+    params.push(MIN_CONGRESS_TO_IMPORT);
+    params.push(MAX_CONGRESS_TO_IMPORT);
   }
 
-  // Optional filter based on presence of votes in our DB
   if (hasVotes === true) {
     whereParts.push(
       `EXISTS (SELECT 1 FROM member_votes mv WHERE mv.bill_id = bills.id)`
@@ -1565,19 +1563,10 @@ app.get("/api/admin/docket", requireAdmin, async (req, res) => {
   }
 
   const whereSql = "WHERE " + whereParts.join(" AND ");
-  const offset = (page - 1) * pageSize;
+  const limit = parseInt(req.query.limit || "200", 10) || 200;
+  params.push(limit);
 
   try {
-    const countResult = await pool.query(
-      `SELECT COUNT(*) AS count FROM bills ${whereSql}`,
-      params
-    );
-    const total = parseInt(countResult.rows[0].count, 10) || 0;
-    const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
-
-    params.push(pageSize);
-    params.push(offset);
-
     const rowsResult = await pool.query(
       `
       SELECT
@@ -1594,83 +1583,15 @@ app.get("/api/admin/docket", requireAdmin, async (req, res) => {
       FROM bills
       ${whereSql}
       ORDER BY bill_date DESC NULLS LAST, title ASC
-      LIMIT $${idx++} OFFSET $${idx++};
+      LIMIT $${idx};
     `,
       params
     );
 
-    res.json({
-      items: rowsResult.rows,
-      page,
-      pageSize,
-      total,
-      totalPages,
-    });
+    // Return a plain array (what index.html expects)
+    res.json(rowsResult.rows);
   } catch (err) {
     console.error("Error fetching docket bills:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// rate a bill in the docket and then sync votes
-app.post("/api/admin/docket/:id/rate", requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { afPosition } = req.body || {};
-
-  const allowed = ["America First", "Neither", "Anti-America First"];
-  if (!allowed.includes(afPosition)) {
-    return res
-      .status(400)
-      .json({ error: "afPosition must be one of: " + allowed.join(", ") });
-  }
-
-  try {
-    console.log("[docket/rate] rated bill", id, "as", afPosition);
-
-    const result = await pool.query(
-      `
-      UPDATE bills
-      SET af_position = $2
-      WHERE id = $1
-      RETURNING
-        id,
-        title,
-        chamber,
-        af_position AS "afPosition",
-        bill_date AS "billDate",
-        description,
-        gov_link AS "govLink",
-        congress,
-        bill_type AS "billType",
-        bill_number AS "billNumber",
-        votes_synced;
-    `,
-      [id, afPosition]
-    );
-
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "Bill not found" });
-    }
-
-    const billRow = result.rows[0];
-
-    try {
-      await syncVotesForBill(billRow.id);
-    } catch (err) {
-      console.error("Error syncing votes after rating bill:", err);
-    }
-
-    const mRes = await pool.query(
-      `SELECT DISTINCT member_id FROM member_votes WHERE bill_id = $1`,
-      [billRow.id]
-    );
-    for (const row of mRes.rows) {
-      await recomputeScoresForMember(row.member_id);
-    }
-
-    res.json(billRow);
-  } catch (err) {
-    console.error("Error rating bill:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
